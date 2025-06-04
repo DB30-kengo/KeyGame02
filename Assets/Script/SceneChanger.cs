@@ -8,7 +8,7 @@ public class SceneChanger : MonoBehaviour
     public string sceneToLoad;
 
     [Tooltip("シーン切り替えまでの待機時間（秒）")]
-    public float delaySeconds = 1.0f;
+    public float delaySeconds = 0.2f;
 
     private bool isTransitioning = false;
 
