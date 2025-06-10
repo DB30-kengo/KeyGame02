@@ -698,7 +698,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0f6a8803d6024474babb4e0a1113cc9b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  sceneToLoad: Chapter1
+  sceneToLoad: Chapter0
   delaySeconds: 1
 --- !u!1 &326824095
 GameObject:
