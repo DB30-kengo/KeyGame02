@@ -666,7 +666,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 829241b5af3614e22baa3c0404ac14e4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  fullText: "\u6575\u306B\u89E6\u308C\u308B\u3068\u30C7\u30FC\u30BF\u3092\u76D7\u8074\u3055\u308C\u3066\u3057\u307E\u3046\u3002\n\n\u76D7\u8074\u3092\u9632\u3050\u306B\u306F\u3001\u3001\u3001\n\n\u30C7\u30FC\u30BF\u3092\u6697\u53F7\u5316\u3059\u308B\u5FC5\u8981\u304C\u3042\u308B\u3002"
+  fullText: "\u6697\u53F7\u5316\u3055\u308C\u305F"
   typingSpeed: 0.05
   startOnEnable: 1
   playSound: 0
