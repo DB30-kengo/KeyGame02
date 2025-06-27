@@ -466,6 +466,10 @@ MonoBehaviour:
   soundVolume: 0.5
   targetTag: Player
   triggerOnce: 1
+  disablePlayerControl: 1
+  playerControlDelay: 0.5
+  disableEnemies: 1
+  enemyDetectionRadius: 20
 --- !u!114 &235170386
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -702,6 +706,10 @@ MonoBehaviour:
   soundVolume: 0.5
   targetTag: Player
   triggerOnce: 1
+  disablePlayerControl: 1
+  playerControlDelay: 0.5
+  disableEnemies: 1
+  enemyDetectionRadius: 20
 --- !u!1 &366064374
 GameObject:
   m_ObjectHideFlags: 0
@@ -1049,6 +1057,10 @@ MonoBehaviour:
   soundVolume: 0.5
   targetTag: Player
   triggerOnce: 1
+  disablePlayerControl: 1
+  playerControlDelay: 0.5
+  disableEnemies: 1
+  enemyDetectionRadius: 20
 --- !u!65 &544552526
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -2669,7 +2681,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8944336655422409503, guid: f6d148d888ffbf54b9afe9936dfaec1f, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -6.27
+      value: -6
       objectReference: {fileID: 0}
     - target: {fileID: 8944336655422409503, guid: f6d148d888ffbf54b9afe9936dfaec1f, type: 3}
       propertyPath: m_LocalRotation.w
@@ -3446,6 +3458,10 @@ MonoBehaviour:
   soundVolume: 0.5
   targetTag: Player
   triggerOnce: 1
+  disablePlayerControl: 1
+  playerControlDelay: 0.5
+  disableEnemies: 1
+  enemyDetectionRadius: 20
 --- !u!65 &1733535364
 BoxCollider:
   m_ObjectHideFlags: 0
