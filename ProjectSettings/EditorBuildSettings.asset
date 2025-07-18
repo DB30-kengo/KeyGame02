@@ -5,23 +5,23 @@ EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
   m_Scenes:
-  - enabled: 1
+  - enabled: 0
     path: Assets/Scenes/SampleScene.unity
     guid: 99c9720ab356a0642a771bea13969a05
   - enabled: 1
-    path: Assets/Scenes/Playground2.unity
+    path: Assets/Scenes/Prototype/Playground2.unity
     guid: 8803bdff25a5c40adb470c2a50b94b30
   - enabled: 1
-    path: Assets/Scenes/Playground1.unity
+    path: Assets/Scenes/Prototype/Playground1.unity
     guid: e9017d5f96b9f09489b4b37e1d6eb914
   - enabled: 1
-    path: Assets/Scenes/Tutorial Level Selection.unity
+    path: Assets/Scenes/Prototype/Tutorial Level Selection.unity
     guid: ae5b3968179b5448d8084230c6650569
   - enabled: 1
-    path: Assets/Scenes/Chapter1.unity
+    path: Assets/Scenes/Prototype/Chapter1.unity
     guid: d4e6eb62555c84018864e59a5ca45bcd
   - enabled: 1
-    path: Assets/Scenes/Chapter0.unity
+    path: Assets/Scenes/Prototype/Chapter0.unity
     guid: e2dfb57b5fbfa4b72b79f5da11e2e37e
   - enabled: 1
     path: Assets/Scenes/Chapter2-1.unity
@@ -43,10 +43,16 @@ EditorBuildSettings:
     guid: a20a5c30bc7014bc88ae94644ee77286
   - enabled: 1
     path: Assets/Scenes/Chapter3-2.unity
-    guid: d4cb3df1ff74e47d28f944ffa88a3e40
+    guid: ce5b752dc0cc84fc3873d2961016ff98
   - enabled: 1
-    path: Assets/Scenes/Chapter0-1.unity
+    path: Assets/Scenes/Prototype/Chapter0-1.unity
     guid: 22cbcc86e6a15402d8e2ec93d6507086
+  - enabled: 1
+    path: Assets/Scenes/New_Chapter1.unity
+    guid: 5ede2617b2e6e4912bbefba0077d2928
+  - enabled: 1
+    path: Assets/Scenes/New_Chapter2.unity
+    guid: 406d55a0e24644317bb9ddbc4de48395
   m_configObjects:
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0

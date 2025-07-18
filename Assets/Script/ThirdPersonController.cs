@@ -33,6 +33,9 @@ namespace StarterAssets
         [Range(0, 1)] public float FootstepAudioVolume = 0.5f;
 
         [Space(10)]
+        [Tooltip("ジャンプ機能を有効にするかどうか")]
+        public bool enableJump = true;
+
         [Tooltip("The height the player can jump")]
         public float JumpHeight = 1.2f;
 
@@ -77,7 +80,7 @@ namespace StarterAssets
 
         [Tooltip("For locking the camera position on all axis")]
         public bool LockCameraPosition = false;
-
+        
         // cinemachine
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
@@ -120,7 +123,7 @@ namespace StarterAssets
 #if ENABLE_INPUT_SYSTEM
                 return _playerInput.currentControlScheme == "KeyboardMouse";
 #else
-				return false;
+                return false;
 #endif
             }
         }
@@ -303,8 +306,8 @@ namespace StarterAssets
                     _verticalVelocity = -2f;
                 }
 
-                // Jump
-                if (_input.jump && _jumpTimeoutDelta <= 0.0f)
+                // Jump - enableJump変数をチェック
+                if (enableJump && _input.jump && _jumpTimeoutDelta <= 0.0f)
                 {
                     // the square root of H * -2 * G = how much velocity needed to reach desired height
                     _verticalVelocity = Mathf.Sqrt(JumpHeight * -2f * Gravity);
