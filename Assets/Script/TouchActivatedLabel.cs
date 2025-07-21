@@ -1,49 +1,56 @@
 using UnityEngine;
 using UnityEngine.UI;
 using System.Collections;
-using UnityEngine.AI; // NavMeshAgentのために追加
+using UnityEngine.AI;
 
-public class TouchActivatedLabel : MonoBehaviour
+public class ObjectInteractionTrigger : MonoBehaviour
 {
+    [Header("相互作用対象")]
+    [Tooltip("インタラクション可能なオブジェクト")]
+    public GameObject interactableObject;
+    
+    [Tooltip("インタラクションの検出範囲")]
+    public float interactionRadius = 2.0f;
+    
     [Header("UI設定")]
     [Tooltip("表示するUIキャンバス")]
     public GameObject uiCanvas;
+    
     [Tooltip("キャンバスをフェードインさせる場合はチェック")]
     public bool useFadeEffect = true;
+    
     [Tooltip("フェードインの速度")]
     public float fadeSpeed = 1.0f;
 
     [Header("サウンド設定")]
     [Tooltip("再生するサウンド")]
     public AudioClip interactionSound;
+    
     [Range(0, 1)]
     [Tooltip("サウンドの音量")]
     public float soundVolume = 0.5f;
 
-    [Header("インタラクション設定")]
-    [Tooltip("インタラクションを検知するタグ（通常は'Player'）")]
-    public string targetTag = "Player";
-    [Tooltip("一度だけ表示する場合はチェック")]
-    public bool triggerOnce = true;
-
     [Header("プレイヤー制御")]
     [Tooltip("UIを表示中にプレイヤーの操作を無効にする")]
     public bool disablePlayerControl = true;
+    
     [Tooltip("プレイヤー操作を無効にするまでの遅延時間（秒）")]
     public float playerControlDelay = 0.5f;
     
     [Header("敵の制御")]
     [Tooltip("UIを表示中に敵の動きを無効にする")]
     public bool disableEnemies = true;
+    
     [Tooltip("無効にする敵の検出範囲（このオブジェクトを中心とした半径）")]
     public float enemyDetectionRadius = 20f;
 
-    private bool hasTriggered = false;
+    private bool hasInteracted = false;
     private CanvasGroup canvasGroup;
     private AudioSource audioSource;
     private GameObject playerObject;
     private StarterAssets.ThirdPersonController playerController;
     private EnemyController[] affectedEnemies = new EnemyController[0];
+    private bool playerInRange = false;
 
     private void Awake()
     {
@@ -68,29 +75,67 @@ public class TouchActivatedLabel : MonoBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
             audioSource.playOnAwake = false;
         }
-    }
-
-    private void OnTriggerEnter(Collider other)
-    {
-        // プレイヤータグを持つオブジェクトと衝突したとき
-        if (other.CompareTag(targetTag))
+        
+        // プレイヤーを検索
+        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+        if (playerObj != null)
         {
-            // プレイヤーオブジェクトを保存
-            playerObject = other.gameObject;
+            playerObject = playerObj;
             playerController = playerObject.GetComponent<StarterAssets.ThirdPersonController>();
-
-            // 一度だけ表示する設定で、既に表示されている場合は何もしない
-            if (triggerOnce && hasTriggered)
-                return;
-
-            // UIキャンバスを表示
-            ShowCanvas();
-            
-            // サウンドを再生
-            PlaySound();
-            
-            hasTriggered = true;
         }
+    }
+    
+    private void Update()
+    {
+        // 既に相互作用済みの場合は何もしない
+        if (hasInteracted) return;
+        
+        // プレイヤーが範囲内にいるかチェック
+        if (playerObject != null && interactableObject != null)
+        {
+            float distanceToInteractable = Vector3.Distance(playerObject.transform.position, interactableObject.transform.position);
+            
+            if (distanceToInteractable <= interactionRadius)
+            {
+                // プレイヤーが範囲内に入ったらUIヒントを表示など
+                if (!playerInRange)
+                {
+                    playerInRange = true;
+                    Debug.Log("インタラクション可能なオブジェクトの範囲内に入りました");
+                    
+                    // ここにUIヒント表示などのコードを追加可能
+                }
+                
+                // インタラクションキー（例：E）が押されたかチェック
+                if (Input.GetKeyDown(KeyCode.E))
+                {
+                    Interact();
+                }
+            }
+            else if (playerInRange)
+            {
+                playerInRange = false;
+                Debug.Log("インタラクション可能なオブジェクトの範囲外に出ました");
+                
+                // ここにUIヒント非表示などのコードを追加可能
+            }
+        }
+    }
+    
+    // 相互作用実行
+    public void Interact()
+    {
+        if (hasInteracted) return;
+        
+        Debug.Log("オブジェクトと相互作用しました");
+        
+        // UIキャンバスを表示
+        ShowCanvas();
+        
+        // サウンドを再生
+        PlaySound();
+        
+        hasInteracted = true;
     }
 
     private void ShowCanvas()
@@ -242,5 +287,16 @@ public class TouchActivatedLabel : MonoBehaviour
         }
         
         uiCanvas.SetActive(false);
+    }
+    
+    // ギズモを描画（エディターでの視覚化用）
+    void OnDrawGizmosSelected()
+    {
+        if (interactableObject != null)
+        {
+            // インタラクション範囲を視覚化
+            Gizmos.color = Color.green;
+            Gizmos.DrawWireSphere(interactableObject.transform.position, interactionRadius);
+        }
     }
 }
