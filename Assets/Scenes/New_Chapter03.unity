@@ -530,7 +530,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sceneChangeDelay: 10
-  targetSceneName: Chapter2-3
+  targetSceneName: 
   autoStart: 1
   useFadeEffect: 1
   fadeTime: 1

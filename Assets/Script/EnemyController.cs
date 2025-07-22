@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.AI;
+using System.Collections.Generic;
 
 public class EnemyController : MonoBehaviour
 {
@@ -27,9 +28,6 @@ public class EnemyController : MonoBehaviour
     [Header("接触設定")]
     [Tooltip("接触判定のためのコライダー半径")]
     public float contactRadius = 1.0f;
-    
-    [Tooltip("距離による接触判定を使用するか（物理的な衝突検出の代わりに）")]
-    public bool useDistanceBasedContact = true;
     
     [Header("サウンド設定")]
     [Tooltip("足音用のオーディオクリップ")]
@@ -76,11 +74,8 @@ public class EnemyController : MonoBehaviour
     {
         if (player == null || agent == null) return;
         
-        // 距離による接触判定を使用する場合のみCheckPlayerContactを呼び出す
-        if (useDistanceBasedContact)
-        {
-            CheckPlayerContact();
-        }
+        // プレイヤーとの接触をチェック
+        CheckPlayerContact();
         
         // プレイヤーに接触済みの場合
         if (hasContactedPlayer)
@@ -133,7 +128,7 @@ public class EnemyController : MonoBehaviour
         }
     }
     
-    // 距離に基づくプレイヤーとの接触チェック
+    // プレイヤーとの接触をチェック
     private void CheckPlayerContact()
     {
         if (hasContactedPlayer || player == null) return;
@@ -144,27 +139,57 @@ public class EnemyController : MonoBehaviour
         if (distanceToPlayer <= contactRadius)
         {
             hasContactedPlayer = true;
-            Debug.Log("プレイヤーと接触しました（距離判定）");
+            Debug.Log("プレイヤーと接触しました");
+            
+            // プレイヤーとの接触時にメッセージを表示（追加）
+            if (MessageDisplay.Instance != null)
+            {
+                MessageDisplay.Instance.ShowMessage("caught");
+            }
+            else
+            {
+                Debug.LogWarning("MessageDisplayインスタンスが見つかりません");
+            }
         }
     }
     
-    // トリガーコライダーによる接触検出
-    private void OnTriggerEnter(Collider other)
-    {
-        if (!hasContactedPlayer && other.CompareTag("Player"))
-        {
-            hasContactedPlayer = true;
-            Debug.Log("プレイヤーと接触しました（トリガー）");
-        }
-    }
-    
-    // 物理的な衝突による接触検出
+    // 物理的な接触判定（追加）
     private void OnCollisionEnter(Collision collision)
     {
         if (!hasContactedPlayer && collision.gameObject.CompareTag("Player"))
         {
             hasContactedPlayer = true;
-            Debug.Log("プレイヤーと接触しました（コリジョン）");
+            Debug.Log("衝突判定でプレイヤーと接触しました");
+            
+            // プレイヤーとの接触時にメッセージを表示
+            if (MessageDisplay.Instance != null)
+            {
+                MessageDisplay.Instance.ShowMessage("caught");
+            }
+            else
+            {
+                Debug.LogWarning("MessageDisplayインスタンスが見つかりません");
+            }
+        }
+    }
+    
+    // トリガー接触判定（追加）
+    private void OnTriggerEnter(Collider other)
+    {
+        if (!hasContactedPlayer && other.CompareTag("Player"))
+        {
+            hasContactedPlayer = true;
+            Debug.Log("トリガー判定でプレイヤーと接触しました");
+            
+            // プレイヤーとの接触時にメッセージを表示
+            if (MessageDisplay.Instance != null)
+            {
+                MessageDisplay.Instance.ShowMessage("caught");
+            }
+            else
+            {
+                Debug.LogWarning("MessageDisplayインスタンスが見つかりません");
+            }
         }
     }
     
