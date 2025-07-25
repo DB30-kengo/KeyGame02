@@ -6,6 +6,9 @@ TagManager:
   tags:
   - CinemachineTarget
   - Enemy
+  - MessageText
+  - GameOverCanvas
+  - GameClearCanvas
   layers:
   - Default
   - TransparentFX

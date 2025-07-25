@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5a574e67f6d14420999f3d025627eebf
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - messageText: {fileID: 136778185763311217, guid: a3bb6c6f6d65946f4a0471f5f965ccfe, type: 3}
+  - gameOverCanvas: {fileID: 6951371841481532223, guid: 992428048261c4599bd582e9089055db, type: 3}
+  - gameClearCanvas: {fileID: 3633086610527012755, guid: 1d03b2f1062f4462bb2123a8089f34ac, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
