@@ -20309,6 +20309,7 @@ MonoBehaviour:
   gameOverCanvasName: GameOverCanvas
   gameClearCanvasName: GameClearCanvas
   messageTextName: MessageText
+  initialMessage: "\u76EE\u7684\u5730\u3092\u76EE\u6307\u305D\u3046\uFF01"
   stage1Message: "\u5171\u901A\u9375\u3092\u30B2\u30C3\u30C8\u3057\u305F"
   stage2Message: "\u6697\u53F7\u5316\u6210\u529F"
   stage3Message: "\u6697\u53F7\u5316\u30C7\u30FC\u30BF\u306F\n\u76D7\u307E\u308C\u3066\u3082\u89E3\u8AAD\u3055\u308C\u307E\u305B\u3093"
@@ -29407,7 +29408,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8944336655422409503, guid: f6d148d888ffbf54b9afe9936dfaec1f, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -12.39
+      value: -16.89
       objectReference: {fileID: 0}
     - target: {fileID: 8944336655422409503, guid: f6d148d888ffbf54b9afe9936dfaec1f, type: 3}
       propertyPath: m_LocalRotation.w
@@ -34789,7 +34790,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2070925441746177912, guid: a1a802ecaf6775746bb2a929fb554ad8, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -12.39
+      value: -16.89
       objectReference: {fileID: 0}
     - target: {fileID: 2070925441746177912, guid: a1a802ecaf6775746bb2a929fb554ad8, type: 3}
       propertyPath: m_LocalRotation.w
@@ -42697,7 +42698,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 3893294197879345259, guid: 64dce48905ffd9b4293e595fa6941544, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -6
+      value: -10.5
       objectReference: {fileID: 0}
     - target: {fileID: 3893294197879345259, guid: 64dce48905ffd9b4293e595fa6941544, type: 3}
       propertyPath: m_LocalRotation.w
