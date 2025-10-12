@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 /// <summary>
 /// クイズで選択できるインタラクティブなオブジェクト

@@ -2,7 +2,6 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Linq;
 
 /// <summary>
 /// ランダムに問題を出題し、プレイヤーの回答順序を記録・判定するマネージャークラス
@@ -12,19 +11,21 @@ public class QuizManager : MonoBehaviour
     [System.Serializable]
     public class QuizQuestion
     {
+        [Tooltip("問題を出題するかどうか")]
+        public bool isEnabled = true;
+        
         [Tooltip("問題文")]
         public string question;
         
         [Tooltip("正解となるオブジェクトID（順番通りに並べる）")]
         public List<int> correctAnswerSequence;
         
-        [Tooltip("問題の難易度（0: 簡単 ～ 10: 難しい）")]
-        [Range(0, 10)]
-        public int difficulty = 5;
-        
         [Tooltip("問題の説明テキスト（オプション）")]
         [TextArea(2, 5)]
         public string description;
+        
+        [Tooltip("誤った順序に対するフィードバック（オプション）")]
+        public List<string> wrongSequenceFeedback;
     }
 
     [Header("問題設定")]
@@ -50,10 +51,10 @@ public class QuizManager : MonoBehaviour
     [Tooltip("回答状態を表示するテキスト（何番目の選択かなど）")]
     public Text answerStatusText;
     
-    [Header("インタラクション設定")]
-    [Tooltip("問題に登場するオブジェクト（ID順に配列に追加）")]
-    public GameObject[] quizObjects;
+    [Tooltip("フィードバックを表示するテキスト")]
+    public Text feedbackText;
     
+    [Header("インタラクション設定")]
     [Tooltip("回答時のサウンドエフェクト")]
     public AudioClip selectSound;
     
@@ -116,10 +117,21 @@ public class QuizManager : MonoBehaviour
             incorrectCanvas.SetActive(false);
         }
         
-        // 問題インデックスのリストを初期化
+        // 問題インデックスのリストを初期化（有効な問題のみ）
+        remainingQuestionIndices.Clear();
         for (int i = 0; i < questions.Count; i++)
         {
-            remainingQuestionIndices.Add(i);
+            // 有効な問題のみをリストに追加
+            if (questions[i].isEnabled)
+            {
+                remainingQuestionIndices.Add(i);
+            }
+        }
+        
+        // 有効な問題がない場合は警告
+        if (remainingQuestionIndices.Count == 0)
+        {
+            Debug.LogWarning("有効な問題がありません。少なくとも1つの問題を有効にしてください。");
         }
     }
 
@@ -141,13 +153,25 @@ public class QuizManager : MonoBehaviour
         playerAnswerSequence.Clear();
         isAnswering = true;
         
-        // 残りの問題がなければ、全問題を再度出題可能にする
+        // 残りの問題がなければ、有効な問題を再度出題可能にする
         if (remainingQuestionIndices.Count == 0)
         {
             Debug.Log("全問題を出題済み。問題リストをリセットします。");
+            remainingQuestionIndices.Clear();
             for (int i = 0; i < questions.Count; i++)
             {
-                remainingQuestionIndices.Add(i);
+                // 有効な問題のみをリストに追加
+                if (questions[i].isEnabled)
+                {
+                    remainingQuestionIndices.Add(i);
+                }
+            }
+            
+            // 有効な問題がない場合は警告して終了
+            if (remainingQuestionIndices.Count == 0)
+            {
+                Debug.LogWarning("有効な問題がありません。少なくとも1つの問題を有効にしてください。");
+                return;
             }
         }
         
@@ -174,13 +198,27 @@ public class QuizManager : MonoBehaviour
         }
         
         // 説明テキストを表示（あれば）
-        if (descriptionText != null)
+        if (descriptionText != null && !string.IsNullOrEmpty(currentQuestion.description))
         {
             descriptionText.text = currentQuestion.description;
+            descriptionText.gameObject.SetActive(true);
+        }
+        else if (descriptionText != null)
+        {
+            descriptionText.gameObject.SetActive(false);
+        }
+        
+        // フィードバックテキストをクリア
+        if (feedbackText != null)
+        {
+            feedbackText.text = "";
         }
         
         // 回答状態をリセット
         UpdateAnswerStatusText();
+        
+        // 全てのクイズオブジェクトをリセット
+        ResetAllQuizObjects();
         
         Debug.Log($"問題を出題: {currentQuestion.question}");
     }
@@ -282,6 +320,12 @@ public class QuizManager : MonoBehaviour
             
             // 正解音を再生
             PlaySound(correctSound);
+            
+            // フィードバックテキストを更新
+            if (feedbackText != null)
+            {
+                feedbackText.text = "正解！";
+            }
         }
         else
         {
@@ -292,10 +336,47 @@ public class QuizManager : MonoBehaviour
             
             // 不正解音を再生
             PlaySound(incorrectSound);
+            
+            // 間違った順序に対するフィードバックを表示
+            if (feedbackText != null && currentQuestion.wrongSequenceFeedback != null && currentQuestion.wrongSequenceFeedback.Count > 0)
+            {
+                // 最初に間違えた場所を特定
+                int firstWrongIndex = GetFirstWrongAnswerIndex();
+                
+                // フィードバックを表示（インデックスに対応するものがあれば）
+                if (firstWrongIndex >= 0 && firstWrongIndex < currentQuestion.wrongSequenceFeedback.Count)
+                {
+                    feedbackText.text = currentQuestion.wrongSequenceFeedback[firstWrongIndex];
+                }
+                else
+                {
+                    feedbackText.text = "不正解。もう一度チャレンジしてみよう！";
+                }
+            }
+            else if (feedbackText != null)
+            {
+                feedbackText.text = "不正解。もう一度チャレンジしてみよう！";
+            }
         }
         
         // 一定時間後に結果表示を終了し、次の問題へ
         StartCoroutine(HideResultAfterDelay(isCorrect));
+    }
+    
+    /// <summary>
+    /// 最初に間違えた回答のインデックスを取得
+    /// </summary>
+    private int GetFirstWrongAnswerIndex()
+    {
+        for (int i = 0; i < playerAnswerSequence.Count; i++)
+        {
+            if (i >= currentQuestion.correctAnswerSequence.Count || 
+                playerAnswerSequence[i] != currentQuestion.correctAnswerSequence[i])
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// <summary>
@@ -324,6 +405,18 @@ public class QuizManager : MonoBehaviour
         
         // 次の問題へ
         StartNextQuestion();
+    }
+
+    /// <summary>
+    /// 全てのクイズオブジェクトをリセットする
+    /// </summary>
+    private void ResetAllQuizObjects()
+    {
+        QuizInteractiveObject[] quizObjects = FindObjectsOfType<QuizInteractiveObject>();
+        foreach (var obj in quizObjects)
+        {
+            obj.ResetSelection();
+        }
     }
 
     /// <summary>
