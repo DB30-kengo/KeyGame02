@@ -26,6 +26,10 @@ public class ConveyorBelt : MonoBehaviour
     [Tooltip("移動させる対象のタグ（空欄の場合はすべてのオブジェクトが対象）")]
     public string targetTag = "";
     
+    [Header("静止時間設定")]
+    [Tooltip("触れた後の静止時間（秒）")]
+    public float delayBeforeMoving = 1.0f;
+    
     [Header("追加設定")]
     [Tooltip("摩擦力（0: 滑りやすい 〜 1: 摩擦が大きい）")]
     [Range(0f, 1f)]
@@ -37,6 +41,9 @@ public class ConveyorBelt : MonoBehaviour
     [Tooltip("オブジェクトの回転を防止するかどうか")]
     public bool preventRotation = true;
     
+    [Tooltip("オブジェクトのrotation値を完全に固定するかどうか")]
+    public bool fixRotationValues = true;
+    
     [Tooltip("動作音")]
     public AudioClip movingSound;
     
@@ -46,6 +53,8 @@ public class ConveyorBelt : MonoBehaviour
     
     // 内部変数
     private List<Rigidbody> objectsOnBelt = new List<Rigidbody>();
+    private Dictionary<Rigidbody, bool> objectsReadyToMove = new Dictionary<Rigidbody, bool>();
+    private Dictionary<Rigidbody, Quaternion> objectsInitialRotation = new Dictionary<Rigidbody, Quaternion>();
     private AudioSource audioSource;
     
     private void Start()
@@ -59,6 +68,14 @@ public class ConveyorBelt : MonoBehaviour
             audioSource.volume = soundVolume;
             audioSource.clip = movingSound;
             
+            // エディタでの保存フラグ問題を回避
+            #if UNITY_EDITOR
+            if (!Application.isPlaying)
+            {
+                UnityEditor.EditorUtility.SetDirty(gameObject);
+            }
+            #endif
+            
             if (isActive)
             {
                 audioSource.Play();
@@ -70,7 +87,7 @@ public class ConveyorBelt : MonoBehaviour
     {
         if (!isActive) return;
         
-        // ベルト上の全てのオブジェクトを移動
+        // ベルト上の全てのオブジェクトを移動（移動準備ができているもののみ）
         for (int i = objectsOnBelt.Count - 1; i >= 0; i--)
         {
             Rigidbody rb = objectsOnBelt[i];
@@ -79,6 +96,20 @@ public class ConveyorBelt : MonoBehaviour
             {
                 // nullの場合はリストから削除
                 objectsOnBelt.RemoveAt(i);
+                if (objectsReadyToMove.ContainsKey(rb))
+                {
+                    objectsReadyToMove.Remove(rb);
+                }
+                if (objectsInitialRotation.ContainsKey(rb))
+                {
+                    objectsInitialRotation.Remove(rb);
+                }
+                continue;
+            }
+            
+            // 移動準備ができていない場合はスキップ
+            if (!objectsReadyToMove.ContainsKey(rb) || !objectsReadyToMove[rb])
+            {
                 continue;
             }
             
@@ -109,6 +140,12 @@ public class ConveyorBelt : MonoBehaviour
             {
                 rb.angularVelocity = Vector3.zero;
             }
+
+            // 回転値を固定する設定が有効な場合
+            if (fixRotationValues && objectsInitialRotation.ContainsKey(rb))
+            {
+                rb.rotation = objectsInitialRotation[rb];
+            }
         }
     }
     
@@ -128,9 +165,20 @@ public class ConveyorBelt : MonoBehaviour
         {
             // リストに追加
             objectsOnBelt.Add(rb);
+            // 最初は移動準備ができていない状態に設定
+            objectsReadyToMove[rb] = false;
+
+            // 初期回転値を記録
+            if (fixRotationValues)
+            {
+                objectsInitialRotation[rb] = rb.rotation;
+            }
+            
+            // 遅延後に移動を開始するコルーチンを開始
+            StartCoroutine(DelayedMovementStart(rb));
             
             // 追加のフィードバック（必要に応じて）
-            Debug.Log($"オブジェクト {collision.gameObject.name} がコンベアベルトに乗りました");
+            Debug.Log($"オブジェクト {collision.gameObject.name} がコンベアベルトに乗りました（{delayBeforeMoving}秒後に移動開始）");
         }
     }
     
@@ -142,9 +190,33 @@ public class ConveyorBelt : MonoBehaviour
         {
             // リストから削除
             objectsOnBelt.Remove(rb);
+            if (objectsReadyToMove.ContainsKey(rb))
+            {
+                objectsReadyToMove.Remove(rb);
+            }
+            if (objectsInitialRotation.ContainsKey(rb))
+            {
+                objectsInitialRotation.Remove(rb);
+            }
             
             // 追加のフィードバック（必要に応じて）
             Debug.Log($"オブジェクト {collision.gameObject.name} がコンベアベルトから離れました");
+        }
+    }
+    
+    /// <summary>
+    /// 指定した時間後にオブジェクトの移動を開始するコルーチン
+    /// </summary>
+    private IEnumerator DelayedMovementStart(Rigidbody rb)
+    {
+        // 指定した秒数だけ待機
+        yield return new WaitForSeconds(delayBeforeMoving);
+        
+        // オブジェクトがまだベルト上にある場合のみ移動を開始
+        if (objectsOnBelt.Contains(rb) && objectsReadyToMove.ContainsKey(rb))
+        {
+            objectsReadyToMove[rb] = true;
+            Debug.Log($"オブジェクト {rb.gameObject.name} の移動が開始されました");
         }
     }
     
