@@ -1,0 +1,392 @@
+using UnityEngine;
+using UnityEngine.UI; // Shadow クラス用に追加
+using System.Collections;
+
+/// <summary>
+/// 暗号学習ゲーム用の3D回答キューブ
+/// プレイヤーが触れることで回答を選択
+/// </summary>
+public class CryptoAnswerCube : MonoBehaviour
+{
+    [Header("回答設定")]
+    [Tooltip("この回答の番号（0 or 1）")]
+    public int answerIndex = 0;
+    
+    [Tooltip("回答テキスト")]
+    public string answerText = "回答1";
+    
+    [Header("インタラクション設定")]
+    [Tooltip("接触を検出するタグ")]
+    public string playerTag = "Player";
+    
+    [Tooltip("トリガー接触を使用するか")]
+    public bool useTriggerCollider = true;
+    
+    [Header("ビジュアル設定")]
+    [Tooltip("通常時のマテリアル")]
+    public Material normalMaterial;
+    
+    [Tooltip("ホバー時のマテリアル")]
+    public Material hoverMaterial;
+    
+    [Tooltip("選択時のマテリアル")]
+    public Material selectedMaterial;
+    
+    [Header("テキスト表示")]
+    [Tooltip("テキスト表示位置のオフセット")]
+    public Vector3 textOffset = new Vector3(0, 0, 0.6f);
+    
+    [Tooltip("テキストのスケール")]
+    public Vector3 textScale = new Vector3(0.1f, 0.1f, 0.1f);
+    
+    [Tooltip("フォントサイズ")]
+    public int fontSize = 50;
+    
+    [Header("エフェクト設定")]
+    [Tooltip("選択時のサウンド")]
+    public AudioClip selectSound;
+    
+    [Tooltip("ホバー時のサウンド")]
+    public AudioClip hoverSound;
+    
+    [Tooltip("選択後の消去エフェクト時間")]
+    public float disappearDelay = 0.3f;
+    
+    // コンポーネント参照
+    private Renderer cubeRenderer;
+    private TextMesh textMesh;
+    private AudioSource audioSource;
+    private CryptoGameManager gameManager;
+    private CryptoUIManager uiManager;
+    
+    // 状態管理
+    private bool isHovered = false;
+    private bool isSelected = false;
+    private bool isActive = true;
+    
+    private void Start()
+    {
+        InitializeComponents();
+        SetupTextDisplay();
+        SetMaterial(normalMaterial);
+    }
+    
+    private void InitializeComponents()
+    {
+        cubeRenderer = GetComponent<Renderer>();
+        audioSource = GetComponent<AudioSource>();
+        
+        if (audioSource == null)
+        {
+            audioSource = gameObject.AddComponent<AudioSource>();
+            audioSource.playOnAwake = false;
+        }
+        
+        // ゲームマネージャーを検索
+        gameManager = FindObjectOfType<CryptoGameManager>();
+        uiManager = FindObjectOfType<CryptoUIManager>();
+    }
+    
+    private void SetupTextDisplay()
+    {
+        // テキスト表示用の子オブジェクト作成
+        GameObject textObject = new GameObject("AnswerText");
+        textObject.transform.SetParent(transform);
+        textObject.transform.localPosition = textOffset;
+        textObject.transform.localScale = textScale;
+        
+        // カメラの方向を向くように設定
+        Camera mainCamera = Camera.main;
+        if (mainCamera != null)
+        {
+            textObject.transform.LookAt(mainCamera.transform);
+            textObject.transform.Rotate(0, 180, 0); // 180度回転して正面を向く
+        }
+        
+        textMesh = textObject.AddComponent<TextMesh>();
+        textMesh.text = answerText;
+        textMesh.anchor = TextAnchor.MiddleCenter;
+        textMesh.alignment = TextAlignment.Center;
+        textMesh.fontSize = fontSize;
+        textMesh.color = Color.white; // 白色に変更（見やすく）
+        
+        // より確実な日本語フォント設定
+        Font selectedFont = null;
+        
+        // システムフォントを試す
+        try 
+        {
+            selectedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        }
+        catch
+        {
+            Debug.LogWarning("LegacyRuntime.ttfの読み込みに失敗");
+        }
+        
+        // フォントが見つからない場合は利用可能なフォントから選択
+        if (selectedFont == null)
+        {
+            Font[] availableFonts = Resources.FindObjectsOfTypeAll<Font>();
+            if (availableFonts.Length > 0)
+            {
+                selectedFont = availableFonts[0];
+                Debug.Log($"代替フォント使用: {selectedFont.name}");
+            }
+        }
+        
+        if (selectedFont != null)
+        {
+            textMesh.font = selectedFont;
+        }
+        
+        // テキストレンダラーの設定を改善
+        MeshRenderer textRenderer = textObject.GetComponent<MeshRenderer>();
+        if (textRenderer != null)
+        {
+            // デフォルトのTextMeshマテリアルを使用
+            if (textMesh.font != null && textMesh.font.material != null)
+            {
+                textRenderer.material = textMesh.font.material;
+            }
+            else
+            {
+                // 基本的なマテリアルを作成
+                Material textMaterial = new Material(Shader.Find("Legacy Shaders/Diffuse"));
+                textMaterial.color = Color.white;
+                textRenderer.material = textMaterial;
+            }
+            
+            // レンダリング設定
+            textRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            textRenderer.receiveShadows = false;
+            textRenderer.sortingOrder = 1000;
+        }
+        
+        Debug.Log($"テキスト表示設定完了: {answerText}, フォント: {selectedFont?.name}");
+    }
+    
+    private void Update()
+    {
+        // テキストをカメラの方向に向ける
+        if (textMesh != null)
+        {
+            Camera mainCamera = Camera.main;
+            if (mainCamera != null)
+            {
+                textMesh.transform.LookAt(mainCamera.transform);
+                textMesh.transform.Rotate(0, 180, 0);
+            }
+        }
+    }
+    
+    // トリガー接触（推奨）
+    private void OnTriggerEnter(Collider other)
+    {
+        if (!useTriggerCollider || !isActive) return;
+        
+        Debug.Log($"トリガー接触検出: {other.name} (タグ: {other.tag})");
+        
+        if (other.CompareTag(playerTag))
+        {
+            OnPlayerSelect(); // ホバーではなく即座に選択
+        }
+    }
+    
+    private void OnTriggerExit(Collider other)
+    {
+        if (!useTriggerCollider || !isActive) return;
+        
+        if (other.CompareTag(playerTag))
+        {
+            OnPlayerExit();
+        }
+    }
+    
+    // 物理接触
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (useTriggerCollider || !isActive) return;
+        
+        Debug.Log($"物理接触検出: {collision.gameObject.name} (タグ: {collision.gameObject.tag})");
+        
+        if (collision.gameObject.CompareTag(playerTag))
+        {
+            OnPlayerSelect();
+        }
+    }
+    
+    private void OnPlayerEnter()
+    {
+        if (isSelected) return;
+        
+        isHovered = true;
+        SetMaterial(hoverMaterial);
+        PlaySound(hoverSound);
+        
+        // UI効果
+        if (uiManager != null)
+        {
+            uiManager.PulseEffect(transform, 0.1f, 4f);
+        }
+        
+        Debug.Log($"回答キューブ {answerIndex} にホバー: {answerText}");
+    }
+    
+    private void OnPlayerExit()
+    {
+        if (isSelected) return;
+        
+        isHovered = false;
+        SetMaterial(normalMaterial);
+    }
+    
+    private void OnPlayerSelect()
+    {
+        if (isSelected || !isActive) return;
+        
+        isSelected = true;
+        isActive = false;
+        
+        SetMaterial(selectedMaterial);
+        PlaySound(selectSound);
+        
+        // 選択エフェクト
+        if (uiManager != null)
+        {
+            uiManager.PlayCorrectAnswerEffects();
+            uiManager.AnimateButtonPress(null); // 3D用のアニメーション
+        }
+        
+        // ゲームマネージャーに回答を通知
+        if (gameManager != null)
+        {
+            gameManager.OnAnswerSelected(answerIndex);
+        }
+        
+        Debug.Log($"回答選択: {answerIndex} - {answerText}");
+        
+        // 選択後の処理
+        StartCoroutine(HandlePostSelection());
+    }
+    
+    private IEnumerator HandlePostSelection()
+    {
+        // 少し待ってから非表示
+        yield return new WaitForSeconds(disappearDelay);
+        
+        // フェードアウト効果
+        yield return StartCoroutine(FadeOut());
+        
+        // オブジェクトを無効化
+        gameObject.SetActive(false);
+    }
+    
+    private IEnumerator FadeOut()
+    {
+        Color originalColor = cubeRenderer.material.color;
+        Color textOriginalColor = textMesh.color;
+        float fadeTime = 0.5f;
+        float elapsedTime = 0f;
+        
+        while (elapsedTime < fadeTime)
+        {
+            float alpha = Mathf.Lerp(1f, 0f, elapsedTime / fadeTime);
+            
+            Color newColor = originalColor;
+            newColor.a = alpha;
+            cubeRenderer.material.color = newColor;
+            
+            Color newTextColor = textOriginalColor;
+            newTextColor.a = alpha;
+            textMesh.color = newTextColor;
+            
+            elapsedTime += Time.deltaTime;
+            yield return null;
+        }
+    }
+    
+    private void SetMaterial(Material material)
+    {
+        if (cubeRenderer != null && material != null)
+        {
+            cubeRenderer.material = material;
+        }
+    }
+    
+    private void PlaySound(AudioClip clip)
+    {
+        if (audioSource != null && clip != null)
+        {
+            audioSource.clip = clip;
+            audioSource.Play();
+        }
+    }
+    
+    // 外部からの制御メソッド
+    public void SetAnswerText(string newText)
+    {
+        answerText = newText;
+        if (textMesh != null)
+        {
+            textMesh.text = newText;
+        }
+    }
+    
+    public void SetAnswerIndex(int index)
+    {
+        answerIndex = index;
+    }
+    
+    public void ResetCube()
+    {
+        isHovered = false;
+        isSelected = false;
+        isActive = true;
+        
+        SetMaterial(normalMaterial);
+        gameObject.SetActive(true);
+        
+        // アルファ値をリセット
+        if (cubeRenderer != null)
+        {
+            Color color = cubeRenderer.material.color;
+            color.a = 1f;
+            cubeRenderer.material.color = color;
+        }
+        
+        if (textMesh != null)
+        {
+            Color textColor = textMesh.color;
+            textColor.a = 1f;
+            textMesh.color = textColor;
+        }
+    }
+    
+    public void SetActive(bool active)
+    {
+        isActive = active;
+        gameObject.SetActive(active);
+        
+        if (active)
+        {
+            ResetCube();
+        }
+    }
+    
+    // ギズモ表示
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = new Color(0, 1, 0, 0.3f);
+        Gizmos.DrawCube(transform.position, transform.localScale);
+        
+        // テキスト位置表示
+        Gizmos.color = Color.yellow;
+        Vector3 textPos = transform.position + transform.TransformDirection(textOffset);
+        Gizmos.DrawWireSphere(textPos, 0.1f);
+        
+        #if UNITY_EDITOR
+        Vector3 labelPos = transform.position + Vector3.up * 2f;
+        UnityEditor.Handles.Label(labelPos, $"回答 {answerIndex}: {answerText}");
+        #endif
+    }
+}
