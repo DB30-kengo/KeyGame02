@@ -10,6 +10,12 @@ public class CryptoGameManager : MonoBehaviour
     public float gameSetDuration = 180f; // 3分
     public int questionsPerSet = 3;
     
+    [Header("暗号方式選択 - Crypto Type Selection")]
+    [Tooltip("出題する暗号方式を選択してください")]
+    public bool enableSymmetricKey = true;  // 共通鍵暗号
+    public bool enablePublicKey = true;     // 公開鍵暗号
+    public bool enableHybrid = true;        // ハイブリッド暗号
+    
     [Header("UI References")]
     public Text questionText;
     public Text progressText;
@@ -84,6 +90,20 @@ public class CryptoGameManager : MonoBehaviour
     
     public void StartNewGameSet()
     {
+        // 有効化された暗号方式を確認
+        List<CryptoType> availableTypes = GetEnabledCryptoTypes();
+        if (availableTypes.Count == 0)
+        {
+            Debug.LogWarning("有効な暗号方式がありません。すべての暗号方式を有効化します。");
+            enableSymmetricKey = true;
+            enablePublicKey = true;
+            enableHybrid = true;
+            availableTypes = GetEnabledCryptoTypes();
+        }
+        
+        // questionsPerSetを有効な暗号方式数に合わせて調整
+        questionsPerSet = availableTypes.Count;
+        
         // ランダムに暗号方式の順序を決定
         currentGameSet = GenerateRandomCryptoSet();
         currentQuestionIndex = 0;
@@ -103,14 +123,26 @@ public class CryptoGameManager : MonoBehaviour
         StartCurrentQuestion();
     }
     
+    private List<CryptoType> GetEnabledCryptoTypes()
+    {
+        List<CryptoType> types = new List<CryptoType>();
+        
+        if (enableSymmetricKey) types.Add(CryptoType.SymmetricKey);
+        if (enablePublicKey) types.Add(CryptoType.PublicKey);
+        if (enableHybrid) types.Add(CryptoType.Hybrid);
+        
+        return types;
+    }
+    
     private CryptoType[] GenerateRandomCryptoSet()
     {
-        List<CryptoType> types = new List<CryptoType> 
-        { 
-            CryptoType.SymmetricKey, 
-            CryptoType.PublicKey, 
-            CryptoType.Hybrid 
-        };
+        List<CryptoType> types = GetEnabledCryptoTypes();
+        
+        if (types.Count == 0)
+        {
+            Debug.LogError("有効な暗号方式がありません！");
+            return new CryptoType[0];
+        }
         
         // シャッフル
         for (int i = 0; i < types.Count; i++)
@@ -239,8 +271,38 @@ public class CryptoGameManager : MonoBehaviour
         CryptoType currentType = currentGameSet[currentQuestionIndex];
         CryptoQuestion question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
         
-        Debug.Log($"回答選択: {answerIndex}, 正解: {question.correctAnswerIndex}");
-        Debug.Log($"選択された回答: {question.answers[answerIndex]}");
+        // 詳細なデバッグログを追加
+        Debug.Log($"[判定詳細] 暗号タイプ: {currentType}, ステップ: {currentStepIndex}");
+        Debug.Log($"[判定詳細] 回答選択: {answerIndex}, 正解: {question.correctAnswerIndex}");
+        Debug.Log($"[判定詳細] 選択された回答: {(answerIndex < question.answers.Length ? question.answers[answerIndex] : "範囲外")}");
+        Debug.Log($"[判定詳細] 正解の回答: {(question.correctAnswerIndex < question.answers.Length ? question.answers[question.correctAnswerIndex] : "範囲外")}");
+        
+        // ハイブリッド暗号の5問目（stepIndex=4）の特別デバッグ
+        if (currentType == CryptoType.Hybrid && currentStepIndex == 4)
+        {
+            Debug.Log($"[ハイブリッド5問目デバッグ] 問題文: {question.questionText}");
+            Debug.Log($"[ハイブリッド5問目デバッグ] 選択肢数: {question.answers.Length}");
+            for (int i = 0; i < question.answers.Length; i++)
+            {
+                Debug.Log($"[ハイブリッド5問目デバッグ] 選択肢{i}: {question.answers[i]}");
+            }
+            Debug.Log($"[ハイブリッド5問目デバッグ] 正解インデックス: {question.correctAnswerIndex}");
+            Debug.Log($"[ハイブリッド5問目デバッグ] 選択されたインデックス: {answerIndex}");
+            Debug.Log($"[ハイブリッド5問目デバッグ] 判定結果: {(answerIndex == question.correctAnswerIndex ? "正解" : "不正解")}");
+        }
+        
+        // 配列範囲チェックを追加
+        if (answerIndex < 0 || answerIndex >= question.answers.Length)
+        {
+            Debug.LogError($"無効な回答インデックス: {answerIndex}, 回答数: {question.answers.Length}");
+            return;
+        }
+        
+        if (question.correctAnswerIndex < 0 || question.correctAnswerIndex >= question.answers.Length)
+        {
+            Debug.LogError($"無効な正解インデックス: {question.correctAnswerIndex}, 回答数: {question.answers.Length}");
+            return;
+        }
         
         totalQuestions++;
         
@@ -252,10 +314,13 @@ public class CryptoGameManager : MonoBehaviour
                 questionText.text = "✅ 正解！";
                 questionText.color = Color.green;
                 
-                // 正解時：3D演出を実行
+                // 正解時：3D演出と転送システムを実行
                 if (animationManager != null)
                 {
                     animationManager.PlayCorrectAnswerAnimation(question);
+                    
+                    // 適切なタイミングで転送を実行
+                    StartCoroutine(DelayedTransferExecution(currentType, currentStepIndex));
                 }
             }
             else
@@ -265,15 +330,46 @@ public class CryptoGameManager : MonoBehaviour
             }
         }
         
-        if (answerIndex == question.correctAnswerIndex)
+        // 判定処理を明確に分離
+        bool isCorrect = (answerIndex == question.correctAnswerIndex);
+        Debug.Log($"[最終判定] 結果: {(isCorrect ? "正解" : "不正解")}");
+        
+        if (isCorrect)
         {
             correctAnswers++;
             StartCoroutine(DelayedCorrectAnswer());
         }
         else
         {
+            // explanationsの配列範囲チェックを追加
+            string explanation = "";
+            if (question.explanations != null && answerIndex < question.explanations.Length)
+            {
+                explanation = question.explanations[answerIndex];
+            }
+            else
+            {
+                explanation = "解説が見つかりません";
+                Debug.LogWarning($"解説が見つかりません。answerIndex: {answerIndex}, explanations配列長: {(question.explanations?.Length ?? 0)}");
+            }
+            
             // 間違えた場合：即座に同じ問題を再出題
-            StartCoroutine(RetryCurrentQuestion(question.explanations[answerIndex]));
+            StartCoroutine(RetryCurrentQuestion(explanation));
+        }
+    }
+    
+    /// <summary>
+    /// アニメーション完了後に転送を実行
+    /// </summary>
+    private IEnumerator DelayedTransferExecution(CryptoType cryptoType, int stepIndex)
+    {
+        // アニメーション完了を待つ
+        yield return new WaitForSeconds(2f);
+        
+        // 転送システムを実行
+        if (animationManager != null)
+        {
+            animationManager.ExecuteCryptoTransfer(cryptoType, stepIndex);
         }
     }
     

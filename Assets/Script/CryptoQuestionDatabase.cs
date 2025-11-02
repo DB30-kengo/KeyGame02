@@ -28,228 +28,303 @@ public static class CryptoQuestionDatabase
     {
         questionDatabase = new Dictionary<CryptoGameManager.CryptoType, List<CryptoQuestion>>();
         
-        // 共通鍵暗号の問題（5問に拡張）
+        // 共通鍵暗号の問題（新しい手順に対応、5問）
         questionDatabase[CryptoGameManager.CryptoType.SymmetricKey] = new List<CryptoQuestion>
         {
+            // 手順1: 共通鍵を作成(エリアa)
             new CryptoQuestion
             {
-                questionText = "共通鍵暗号で使用する鍵は？",
-                answers = new string[] { "共通鍵", "公開鍵ペア" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "", 
-                    "❌ 共通鍵暗号では同じ鍵を使用\n\n公開鍵ペアは公開鍵暗号で使用します\n\n💡 共通鍵暗号 = 1つの鍵で暗号化と復号" 
-                },
-                animationType = "show_symmetric_key",
-                animationTargets = new string[] { "SymmetricKey" },
-                targetPositions = new Vector3[] { new Vector3(0, 2, 0) }
-            },
-            new CryptoQuestion
-            {
-                questionText = "データを暗号化するには？",
-                answers = new string[] { "共通鍵で暗号化", "公開鍵で暗号化" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "", 
-                    "❌ 共通鍵暗号では共通鍵を使用\n\n同じ鍵で暗号化と復号を行います" 
-                },
-                animationType = "encrypt_data",
-                animationTargets = new string[] { "DataCube", "SymmetricKey" },
-                targetPositions = new Vector3[] { new Vector3(-2, 1, 0), new Vector3(-2, 2, 0) }
-            },
-            new CryptoQuestion
-            {
-                questionText = "暗号化されたデータの見た目は？",
-                answers = new string[] { "読めない形に変化", "元のまま" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "", 
-                    "❌ 暗号化により内容が変化\n\n暗号化されたデータは元の形では読み取れません" 
-                },
-                animationType = "transform_encrypted",
-                animationTargets = new string[] { "DataCube" },
-                targetPositions = new Vector3[] { new Vector3(-2, 1, 0) }
-            },
-            new CryptoQuestion
-            {
-                questionText = "鍵の送信方法は？",
-                answers = new string[] { "暗号文と一緒に", "事前配布済み" },
+                questionText = "共通鍵暗号において、送信者（エリアA）が最初に何を作成する必要がありますか？",
+                answers = new string[] { "公開鍵", "共通鍵", "秘密鍵", "デジタル署名" },
                 correctAnswerIndex = 1,
                 explanations = new string[] 
-                { 
-                    "❌ 鍵配送問題が発生！\n\n鍵と暗号文を同じ経路で送ると\n盗聴者に両方見られます\n\n💡 解決策: 事前に安全な方法で鍵を配布",
-                    "" 
+                {
+                    "❌ 公開鍵は公開鍵暗号で使用されます。",
+                    "✅ 正解！共通鍵暗号では送信者と受信者が同じ鍵を共有します。",
+                    "❌ 秘密鍵は公開鍵暗号で使用されます。",
+                    "❌ デジタル署名は認証に使用されます。"
                 },
-                animationType = "transfer_key_secure",
-                animationTargets = new string[] { "SymmetricKey" },
-                targetPositions = new Vector3[] { new Vector3(5, 1, 0) }
+                animationType = "create_symmetric_key_a"
             },
+            
+            // 手順2: 平文の暗号化(エリアa)
             new CryptoQuestion
             {
-                questionText = "受信者は何で復号する？",
-                answers = new string[] { "同じ共通鍵", "別の鍵" },
+                questionText = "エリアAで作成した共通鍵を使って、平文データを暗号化します。共通鍵暗号の処理特徴は？",
+                answers = new string[] { "高速で効率的", "鍵配布が簡単", "計算負荷が高い", "ネットワークが不要" },
                 correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "", 
-                    "❌ 共通鍵暗号では同じ鍵を使用\n\n暗号化と復号に同じ鍵を使うのが特徴です" 
+                explanations = new string[]
+                {
+                    "✅ 正解！共通鍵暗号は高速で大量のデータ処理に適しています。",
+                    "❌ 共通鍵暗号の課題は安全な鍵配布です。",
+                    "❌ 共通鍵暗号は計算負荷が低いのが特徴です。",
+                    "❌ 鍵の配布にはネットワークが必要です。"
                 },
-                animationType = "decrypt_data",
-                animationTargets = new string[] { "DataCube", "SymmetricKey" },
-                targetPositions = new Vector3[] { new Vector3(5, 1, 0), new Vector3(5, 2, 0) }
+                animationType = "encrypt_data_a"
+            },
+            
+            // 手順3: 暗号文を送信(エリアaからb)
+            new CryptoQuestion
+            {
+                questionText = "暗号化されたデータをエリアAからエリアBに送信します。この暗号文の安全性は何によって保たれますか？",
+                answers = new string[] { "送信経路の暗号化", "共通鍵の秘匿性", "データの圧縮", "送信速度" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 送信経路も重要ですが、根本的な安全性は鍵にあります。",
+                    "✅ 正解！共通鍵が秘密に保たれている限り、暗号文は安全です。",
+                    "❌ 圧縮は安全性とは関係ありません。",
+                    "❌ 送信速度は安全性に影響しません。"
+                },
+                animationType = "transfer_encrypted_data_atob"
+            },
+            
+            // 手順4: 共通鍵を事前に送信(エリアbの真下からもう一つの共通鍵が登場)
+            new CryptoQuestion
+            {
+                questionText = "受信者（エリアB）が暗号文を復号するために必要なものは？",
+                answers = new string[] { "新しい鍵", "送信者と同じ共通鍵", "公開鍵", "パスワード" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 新しい鍵では復号できません。",
+                    "✅ 正解！共通鍵暗号では暗号化と復号に同じ鍵を使用します。",
+                    "❌ 公開鍵は公開鍵暗号で使用されます。",
+                    "❌ パスワードだけでは復号できません。"
+                },
+                animationType = "show_symmetric_key_b"
+            },
+            
+            // 手順5: 暗号文を復号(エリアb)
+            new CryptoQuestion
+            {
+                questionText = "エリアBで共通鍵を使って復号が完了しました。共通鍵暗号の最大の課題は？",
+                answers = new string[] { "暗号化が遅い", "安全な鍵配布", "計算が複雑", "データサイズが大きくなる" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 共通鍵暗号は高速です。",
+                    "✅ 正解！事前に安全に鍵を共有する必要があることが最大の課題です。",
+                    "❌ 共通鍵暗号は計算が単純です。",
+                    "❌ データサイズはあまり変わりません。"
+                },
+                animationType = "decrypt_data_b"
             }
         };
-        
-        // 公開鍵暗号の問題（5問に拡張）
+
+        // 公開鍵暗号の問題（新しい手順に対応、5問）
         questionDatabase[CryptoGameManager.CryptoType.PublicKey] = new List<CryptoQuestion>
         {
+            // 手順1: 公開鍵と秘密鍵の作成（エリアb）
             new CryptoQuestion
             {
-                questionText = "公開鍵暗号で使用する鍵は？",
-                answers = new string[] { "共通鍵", "公開鍵ペア" },
+                questionText = "公開鍵暗号において、受信者（エリアB）が最初に作成するのは？",
+                answers = new string[] { "共通鍵", "鍵ペア（公開鍵と秘密鍵）", "デジタル署名", "ハッシュ値" },
                 correctAnswerIndex = 1,
-                explanations = new string[] 
-                { 
-                    "❌ 公開鍵暗号には鍵ペアが必要\n\n共通鍵では暗号化と復号に\n同じ鍵を使用します\n\n💡 公開鍵暗号 = 異なる鍵で暗号化と復号",
-                    "" 
+                explanations = new string[]
+                {
+                    "❌ 共通鍵は共通鍵暗号で使用されます。",
+                    "✅ 正解！公開鍵暗号では公開鍵と秘密鍵のペアを作成します。",
+                    "❌ デジタル署名は認証に使用されます。",
+                    "❌ ハッシュ値は整合性確認に使用されます。"
                 },
-                animationType = "show_key_pair",
-                animationTargets = new string[] { "PublicKey", "PrivateKey" },
-                targetPositions = new Vector3[] { new Vector3(-1, 2, 0), new Vector3(1, 2, 0) }
+                animationType = "create_keypair_b"
             },
+            
+            // 手順2: 公開鍵を送信（エリアbからa）
             new CryptoQuestion
             {
-                questionText = "データ暗号化に使う鍵は？",
-                answers = new string[] { "自分の秘密鍵", "相手の公開鍵" },
+                questionText = "作成した鍵ペアのうち、エリアBからエリアAに送信するのはどちらですか？",
+                answers = new string[] { "秘密鍵", "公開鍵", "両方", "どちらも送信しない" },
                 correctAnswerIndex = 1,
-                explanations = new string[] 
-                { 
-                    "❌ なりすまし問題が発生！\n\n秘密鍵で暗号化すると\n誰でも公開鍵で復号できます\n\n💡 正解: 相手の公開鍵で暗号化\n→相手のみ復号可能",
-                    "" 
+                explanations = new string[]
+                {
+                    "❌ 秘密鍵は絶対に他人に知られてはいけません。",
+                    "✅ 正解！公開鍵は誰に知られても安全なので送信します。",
+                    "❌ 秘密鍵は秘密にしておく必要があります。",
+                    "❌ 公開鍵は送信する必要があります。"
                 },
-                animationType = "encrypt_with_public",
-                animationTargets = new string[] { "DataCube", "PublicKey" },
-                targetPositions = new Vector3[] { new Vector3(-2, 1, 0), new Vector3(-2, 2, 0) }
+                animationType = "transfer_public_key_btoa"
             },
+            
+            // 手順3: 公開鍵で平文の暗号化(エリアa)
             new CryptoQuestion
             {
-                questionText = "公開鍵の配布方法は？",
-                answers = new string[] { "秘密にする", "公開する" },
+                questionText = "エリアAで受信した公開鍵を使って暗号化します。公開鍵暗号の特徴は？",
+                answers = new string[] { "高速処理", "鍵配布が安全", "大容量データに最適", "計算負荷が低い" },
                 correctAnswerIndex = 1,
-                explanations = new string[] 
-                { 
-                    "❌ 公開鍵は文字通り公開\n\n公開鍵を秘密にすると\n誰も暗号化できません\n\n💡 公開鍵は自由に配布可能",
-                    "" 
+                explanations = new string[]
+                {
+                    "❌ 公開鍵暗号は処理が重いです。",
+                    "✅ 正解！公開鍵は公開しても安全なので、鍵配布の問題が解決されます。",
+                    "❌ 公開鍵暗号は大容量データには不向きです。",
+                    "❌ 公開鍵暗号は計算負荷が高いです。"
                 },
-                animationType = "transfer_public_key",
-                animationTargets = new string[] { "PublicKey" },
-                targetPositions = new Vector3[] { new Vector3(0, 1, 3) }
+                animationType = "encrypt_with_public_a"
             },
+            
+            // 手順4: 暗号文を送信(エリアaからb)
             new CryptoQuestion
             {
-                questionText = "復号に使う鍵は？",
-                answers = new string[] { "自分の秘密鍵", "相手の公開鍵" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "",
-                    "❌ 復号には秘密鍵が必要\n\n公開鍵で暗号化されたデータは\n対応する秘密鍵でのみ復号可能\n\n💡 暗号化=相手の公開鍵\n復号=自分の秘密鍵" 
+                questionText = "公開鍵で暗号化されたデータをエリアAからエリアBに送信します。この暗号文を復号できるのは？",
+                answers = new string[] { "公開鍵の持ち主", "秘密鍵の持ち主", "暗号化した人", "誰でも" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 公開鍵では復号できません。",
+                    "✅ 正解！公開鍵で暗号化されたデータは対応する秘密鍵でのみ復号できます。",
+                    "❌ 暗号化した人は秘密鍵を持っていません。",
+                    "❌ 秘密鍵を持つ人のみが復号できます。"
                 },
-                animationType = "decrypt_with_private",
-                animationTargets = new string[] { "DataCube", "PrivateKey" },
-                targetPositions = new Vector3[] { new Vector3(5, 1, 0), new Vector3(5, 2, 0) }
+                animationType = "transfer_encrypted_data_atob_public"
             },
+            
+            // 手順5: 秘密鍵で復号化（エリアb）
             new CryptoQuestion
             {
-                questionText = "秘密鍵の管理方法は？",
-                answers = new string[] { "厳重に秘匿", "自由に配布" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "", 
-                    "❌ 秘密鍵が漏れると危険\n\n秘密鍵を知られると\n暗号が解読されてしまいます\n\n💡 秘密鍵は絶対に秘匿" 
+                questionText = "エリアBで秘密鍵による復号が完了しました。公開鍵暗号の利点は？",
+                answers = new string[] { "処理が高速", "事前の鍵共有が不要", "計算が簡単", "データ圧縮効果" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 公開鍵暗号は処理が重いです。",
+                    "✅ 正解！事前に秘密の鍵を共有する必要がないのが大きな利点です。",
+                    "❌ 公開鍵暗号は計算が複雑です。",
+                    "❌ データ圧縮とは関係ありません。"
                 },
-                animationType = "secure_private_key",
-                animationTargets = new string[] { "PrivateKey" },
-                targetPositions = new Vector3[] { new Vector3(5, 0, 0) }
+                animationType = "decrypt_with_private_b"
             }
         };
-        
-        // ハイブリッド暗号の問題（5問に拡張）
+
+        // ハイブリッド暗号の問題（新しい手順に対応、8問に拡張）
         questionDatabase[CryptoGameManager.CryptoType.Hybrid] = new List<CryptoQuestion>
         {
+            // 手順1: 公開鍵と秘密鍵を作成（エリアb）
             new CryptoQuestion
             {
-                questionText = "大きなデータの暗号化方式は？",
-                answers = new string[] { "公開鍵で直接", "セッション鍵で" },
+                questionText = "ハイブリッド暗号において、受信者（エリアB）が最初に作成するのは？",
+                answers = new string[] { "共通鍵のみ", "公開鍵と秘密鍵のペア", "デジタル証明書", "ハッシュ値" },
                 correctAnswerIndex = 1,
-                explanations = new string[] 
-                { 
-                    "❌ 処理速度の問題！\n\n大きなデータを公開鍵暗号で\n直接暗号化すると非常に遅い\n\n💡 解決策: 高速な共通鍵暗号\n（セッション鍵）を使用",
-                    "" 
+                explanations = new string[]
+                {
+                    "❌ 共通鍵は後で使用されます。",
+                    "✅ 正解！ハイブリッド暗号でも公開鍵暗号の仕組みを利用します。",
+                    "❌ 証明書は認証で使用されます。",
+                    "❌ ハッシュ値は整合性確認で使用されます。"
                 },
-                animationType = "show_session_key",
-                animationTargets = new string[] { "SessionKey" },
-                targetPositions = new Vector3[] { new Vector3(0, 2, 0) }
+                animationType = "create_hybrid_keypair_b"
             },
+            
+            // 手順2: 公開鍵を送信（エリアbからa）
             new CryptoQuestion
             {
-                questionText = "セッション鍵でデータを？",
-                answers = new string[] { "暗号化する", "復号化する" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "", 
-                    "❌ まず暗号化が必要\n\nセッション鍵を使って\nデータを暗号化します" 
-                },
-                animationType = "encrypt_with_session",
-                animationTargets = new string[] { "DataCube", "SessionKey" },
-                targetPositions = new Vector3[] { new Vector3(-2, 1, 0), new Vector3(-2, 2, 0) }
-            },
-            new CryptoQuestion
-            {
-                questionText = "セッション鍵の送信方法は？",
-                answers = new string[] { "平文で送信", "公開鍵暗号で" },
+                questionText = "エリアBからエリアAに公開鍵を送信する理由は？",
+                answers = new string[] { "データ暗号化のため", "共通鍵の暗号化のため", "身元確認のため", "速度向上のため" },
                 correctAnswerIndex = 1,
-                explanations = new string[] 
-                { 
-                    "❌ セッション鍵が盗聴される！\n\nセッション鍵が平文だと\nデータも復号されてしまいます\n\n💡 正解: 公開鍵暗号で\nセッション鍵を保護",
-                    "" 
+                explanations = new string[]
+                {
+                    "❌ データは共通鍵で暗号化されます。",
+                    "✅ 正解！ハイブリッド暗号では共通鍵を公開鍵で暗号化します。",
+                    "❌ 身元確認は別の仕組みです。",
+                    "❌ 速度向上が目的ではありません。"
                 },
-                animationType = "encrypt_session_key",
-                animationTargets = new string[] { "SessionKey", "PublicKey" },
-                targetPositions = new Vector3[] { new Vector3(0, 1, 0), new Vector3(0, 2, 0) }
+                animationType = "transfer_hybrid_public_btoa"
             },
+            
+            // 手順3: 公開鍵で共通鍵を暗号化（エリアa）
             new CryptoQuestion
             {
-                questionText = "受信者の復号順序は？",
-                answers = new string[] { "セッション鍵→データ", "データ→セッション鍵" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "",
-                    "❌ 復号順序が間違い！\n\n最初にセッション鍵を復号しないと\nデータを復号できません\n\n💡 正しい順序:\n1.セッション鍵復号\n2.データ復号" 
+                questionText = "エリアAで公開鍵を使って共通鍵を暗号化します。この方法の利点は？",
+                answers = new string[] { "高速なデータ処理", "安全な鍵配布", "計算負荷の軽減", "データ圧縮" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ データ処理自体は共通鍵で行います。",
+                    "✅ 正解！公開鍵暗号により共通鍵を安全に送信できます。",
+                    "❌ 公開鍵暗号は計算負荷が高いです。",
+                    "❌ データ圧縮とは関係ありません。"
                 },
-                animationType = "decrypt_sequence",
-                animationTargets = new string[] { "SessionKey", "DataCube", "PrivateKey" },
-                targetPositions = new Vector3[] { new Vector3(3, 2, 0), new Vector3(5, 1, 0), new Vector3(5, 2, 0) }
+                animationType = "encrypt_symmetric_with_public_a"
             },
+            
+            // 手順4: 暗号化した鍵を送信（エリアaからb）
             new CryptoQuestion
             {
-                questionText = "ハイブリッド暗号の利点は？",
-                answers = new string[] { "高速＋安全", "低速だが安全" },
-                correctAnswerIndex = 0,
-                explanations = new string[] 
-                { 
-                    "", 
-                    "❌ ハイブリッドの特徴は速度\n\n共通鍵の高速性と\n公開鍵の安全性を両立\n\n💡 大きなデータでも高速暗号化" 
+                questionText = "暗号化された共通鍵をエリアAからエリアBに送信します。受信者はどのように共通鍵を取得しますか？",
+                answers = new string[] { "公開鍵で復号", "秘密鍵で復号", "パスワードで復号", "自動で復号" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 公開鍵では復号できません。",
+                    "✅ 正解！公開鍵で暗号化されたものは秘密鍵で復号します。",
+                    "❌ パスワードは使用しません。",
+                    "❌ 自動では復号できません。"
                 },
-                animationType = "show_advantages",
-                animationTargets = new string[] { "DataCube", "SessionKey", "PublicKey" },
-                targetPositions = new Vector3[] { new Vector3(5, 1, 0), new Vector3(3, 2, 0), new Vector3(1, 2, 0) }
+                animationType = "transfer_encrypted_key_atob"
+            },
+            
+            // 手順5: 暗号文を復号（エリアb）
+            new CryptoQuestion
+            {
+                questionText = "エリアBで秘密鍵を使って共通鍵を復号しました。次に必要なのは？",
+                answers = new string[] { "データの送信", "新しい鍵の作成", "暗号化されたデータの受信", "システムの再起動" },
+                correctAnswerIndex = 2,
+                explanations = new string[]
+                {
+                    "❌ データは送信者側で既に準備されています。",
+                    "❌ 新しい鍵は必要ありません。",
+                    "✅ 正解！共通鍵を取得した後、暗号化されたデータを受信します。",
+                    "❌ システムの再起動は不要です。"
+                },
+                animationType = "decrypt_symmetric_key_b"
+            },
+            
+            // 手順6: 平文を共通鍵で暗号化（エリアa)
+            new CryptoQuestion
+            {
+                questionText = "エリアAで実際のデータを共通鍵で暗号化します。共通鍵を使う理由は？",
+                answers = new string[] { "安全性が高い", "処理速度が速い", "鍵配布が簡単", "計算が複雑" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 安全性は公開鍵暗号と同等です。",
+                    "✅ 正解！大容量データの処理には高速な共通鍵暗号が適しています。",
+                    "❌ 鍵配布は公開鍵暗号で解決済みです。",
+                    "❌ 共通鍵暗号は計算が単純です。"
+                },
+                animationType = "encrypt_data_with_symmetric_a"
+            },
+            
+            // 手順7: 暗号文を送信（エリアaからb)
+            new CryptoQuestion
+            {
+                questionText = "共通鍵で暗号化されたデータをエリアAからエリアBに送信します。この時点で受信者が持っているのは？",
+                answers = new string[] { "公開鍵のみ", "秘密鍵と共通鍵", "共通鍵のみ", "何も持っていない" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 公開鍵だけでは復号できません。",
+                    "✅ 正解！受信者は秘密鍵と、それで復号した共通鍵を持っています。",
+                    "❌ 秘密鍵も必要です。",
+                    "❌ 既に鍵を復号しています。"
+                },
+                animationType = "transfer_hybrid_data_atob"
+            },
+            
+            // 手順8: 秘密鍵で復号化（エリアb）
+            new CryptoQuestion
+            {
+                questionText = "エリアBで共通鍵を使って最終的にデータを復号しました。ハイブリッド暗号の最大の利点は？",
+                answers = new string[] { "計算が簡単", "両方の暗号方式の利点を活用", "鍵が一つだけ", "ネットワーク不要" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 実際には計算が複雑になります。",
+                    "✅ 正解！公開鍵暗号の安全な鍵配布と共通鍵暗号の高速処理を両立しています。",
+                    "❌ 実際には複数の鍵を使用します。",
+                    "❌ ネットワークは必要です。"
+                },
+                animationType = "decrypt_hybrid_data_b"
             }
         };
     }
