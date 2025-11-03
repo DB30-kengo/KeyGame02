@@ -165,10 +165,48 @@ public class CryptoGameManager : MonoBehaviour
         }
         
         CryptoType currentType = currentGameSet[currentQuestionIndex];
+        
+        // 問題開始時に暗号方式に応じた鍵を表示
+        if (animationManager != null)
+        {
+            // 1問目（currentStepIndex == 0）の場合は必ず鍵を表示
+            // それ以外は鍵が既に表示されているかチェックして必要に応じて表示
+            if (currentStepIndex == 0 || ShouldShowKeysForCurrentStep())
+            {
+                Debug.Log($"暗号方式 {currentType} の鍵を表示 (ステップ: {currentStepIndex})");
+                animationManager.ShowKeysForCryptoType(currentType);
+            }
+        }
+        
         CryptoQuestion question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
         
         DisplayQuestion(question);
         UpdateProgressText();
+    }
+
+    /// <summary>
+    /// 現在のステップで鍵を表示すべきかどうかを判定
+    /// </summary>
+    private bool ShouldShowKeysForCurrentStep()
+    {
+        // 各暗号方式で、該当する鍵が表示されているかチェック
+        switch (currentGameSet[currentQuestionIndex])
+        {
+            case CryptoType.SymmetricKey:
+                return animationManager.symmetricKey != null && !animationManager.symmetricKey.activeInHierarchy;
+                
+            case CryptoType.PublicKey:
+                return (animationManager.publicKey != null && !animationManager.publicKey.activeInHierarchy) ||
+                       (animationManager.privateKey != null && !animationManager.privateKey.activeInHierarchy);
+                       
+            case CryptoType.Hybrid:
+                return (animationManager.sessionKey != null && !animationManager.sessionKey.activeInHierarchy) ||
+                       (animationManager.publicKey != null && !animationManager.publicKey.activeInHierarchy) ||
+                       (animationManager.privateKey != null && !animationManager.privateKey.activeInHierarchy);
+                       
+            default:
+                return false;
+        }
     }
     
     private void DisplayQuestion(CryptoQuestion question)
@@ -317,7 +355,19 @@ public class CryptoGameManager : MonoBehaviour
                 // 正解時：3D演出と転送システムを実行
                 if (animationManager != null)
                 {
-                    animationManager.PlayCorrectAnswerAnimation(question);
+                    // アニメーションタイプに応じて適切なメソッドを呼び出し
+                    string animationType = question.animationType;
+                    
+                    if (animationType == "create_keypair_b")
+                    {
+                        // エリアBでの鍵ペア生成（公開鍵暗号方式の最初の問題）
+                        animationManager.CreateKeyPairAtB();
+                    }
+                    else
+                    {
+                        // 従来のアニメーション
+                        animationManager.PlayCorrectAnswerAnimation(question);
+                    }
                     
                     // 適切なタイミングで転送を実行
                     StartCoroutine(DelayedTransferExecution(currentType, currentStepIndex));

@@ -128,7 +128,7 @@ public static class CryptoQuestionDatabase
                     "❌ デジタル署名は認証に使用されます。",
                     "❌ ハッシュ値は整合性確認に使用されます。"
                 },
-                animationType = "create_keypair_b"
+                animationType = "show_key_pair"
             },
             
             // 手順2: 公開鍵を送信（エリアbからa）
@@ -144,7 +144,7 @@ public static class CryptoQuestionDatabase
                     "❌ 秘密鍵は秘密にしておく必要があります。",
                     "❌ 公開鍵は送信する必要があります。"
                 },
-                animationType = "transfer_public_key_btoa"
+                animationType = "move_public_key_to_a"
             },
             
             // 手順3: 公開鍵で平文の暗号化(エリアa)
@@ -160,7 +160,7 @@ public static class CryptoQuestionDatabase
                     "❌ 公開鍵暗号は大容量データには不向きです。",
                     "❌ 公開鍵暗号は計算負荷が高いです。"
                 },
-                animationType = "encrypt_with_public_a"
+                animationType = "transform_data_to_encrypted"
             },
             
             // 手順4: 暗号文を送信(エリアaからb)
@@ -176,7 +176,7 @@ public static class CryptoQuestionDatabase
                     "❌ 暗号化した人は秘密鍵を持っていません。",
                     "❌ 秘密鍵を持つ人のみが復号できます。"
                 },
-                animationType = "transfer_encrypted_data_atob_public"
+                animationType = "move_encrypted_cube_to_b"
             },
             
             // 手順5: 秘密鍵で復号化（エリアb）
@@ -192,7 +192,7 @@ public static class CryptoQuestionDatabase
                     "❌ 公開鍵暗号は計算が複雑です。",
                     "❌ データ圧縮とは関係ありません。"
                 },
-                animationType = "decrypt_with_private_b"
+                animationType = "decrypt_cube_at_b"
             }
         };
 
