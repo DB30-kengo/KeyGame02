@@ -166,6 +166,9 @@ public class CryptoAnimationManager : MonoBehaviour
     // エリアBの鍵オブジェクトを管理する変数を追加
     private GameObject keyAtBObject;
 
+    // 共通鍵の表示状態を管理するフラグを追加
+    private bool isSymmetricKeyShownAtB = false;
+
     [Header("エフェクト用マテリアル")]
     public Material glowMaterial;
     public Material encryptedMaterial;
@@ -358,7 +361,68 @@ public class CryptoAnimationManager : MonoBehaviour
             Debug.LogWarning("暗号化キューブがnullです");
         }
         
+        // 演出状態フラグも初期化
+        isSymmetricKeyShownAtB = false;
+        Debug.Log("共通鍵表示フラグを初期化");
+        
         Debug.Log("CryptoAnimationManager: 初期表示状態設定完了 - データキューブのみ表示");
+    }
+    
+    /// <summary>
+    /// 全ての鍵オブジェクトを非表示にする
+    /// 各暗号方式の1問目開始時に呼び出される
+    /// </summary>
+    public void HideAllKeys()
+    {
+        Debug.Log("CryptoAnimationManager: 全ての鍵を非表示に設定中...");
+        
+        // 共通鍵を非表示
+        if (symmetricKey != null)
+        {
+            symmetricKey.SetActive(false);
+            Debug.Log("共通鍵を非表示に設定");
+        }
+        
+        // 公開鍵を非表示
+        if (publicKey != null)
+        {
+            publicKey.SetActive(false);
+            Debug.Log("公開鍵を非表示に設定");
+        }
+        
+        // 秘密鍵を非表示
+        if (privateKey != null)
+        {
+            privateKey.SetActive(false);
+            Debug.Log("秘密鍵を非表示に設定");
+        }
+        
+        // セッション鍵を非表示
+        if (sessionKey != null)
+        {
+            sessionKey.SetActive(false);
+            Debug.Log("セッション鍵を非表示に設定");
+        }
+        
+        // 暗号化キューブも非表示にする
+        if (encryptedDataCube != null)
+        {
+            encryptedDataCube.SetActive(false);
+            Debug.Log("暗号化キューブを非表示に設定");
+        }
+        
+        // データキューブは表示状態を維持
+        if (dataCube != null)
+        {
+            dataCube.SetActive(true);
+            Debug.Log("データキューブは表示状態を維持");
+        }
+        
+        // 演出状態フラグをリセット
+        isSymmetricKeyShownAtB = false;
+        Debug.Log("共通鍵表示フラグをリセット");
+        
+        Debug.Log("CryptoAnimationManager: 全ての鍵の非表示設定完了");
     }
     
     /// <summary>
@@ -885,9 +949,18 @@ public class CryptoAnimationManager : MonoBehaviour
     {
         if (symmetricKey != null)
         {
-            yield return StartCoroutine(MoveObject(symmetricKey, animPositions.keyCreationPositionA, moveAnimationTime));
-            yield return StartCoroutine(GlowEffect(symmetricKey));
+            // 1問目正解時：共通鍵は表示せず、位置のみ設定
+            Debug.Log("共通鍵の位置を設定（まだ非表示）");
+            
+            // 共通鍵は非表示のまま位置だけ設定
+            symmetricKey.transform.position = animPositions.keyCreationPositionA;
+            
+            // エフェクトも実行しない（鍵が見えないため）
+            Debug.Log("1問目完了：共通鍵は2問目まで非表示");
         }
+        
+        // IEnumeratorなので何かyield returnする必要がある
+        yield return null;
     }
     
     private IEnumerator EncryptDataAtA()
@@ -911,81 +984,88 @@ public class CryptoAnimationManager : MonoBehaviour
     
     private IEnumerator ShowSymmetricKeyAtB()
     {
+        Debug.Log("ShowSymmetricKeyAtB開始");
+        
+        // 既に共通鍵がエリアBに表示済みの場合はスキップ
+        if (isSymmetricKeyShownAtB)
+        {
+            Debug.Log("共通鍵は既にエリアBに表示済みのため、演出をスキップします");
+            yield break;
+        }
+        
         if (symmetricKey != null)
         {
-            // エリアBに事前配布済みの共通鍵を表示
-            // 元の共通鍵は移動させず、エリアBに独立したキューブを作成して表示
-            keyAtBObject = CreateKeyIndicatorAtB();
-            if (keyAtBObject != null)
-            {
-                // エリアBの鍵表示位置に配置
-                keyAtBObject.transform.position = animPositions.keyAppearPositionB;
-                
-                // 地面から上昇してエリアBの位置に移動
-                yield return StartCoroutine(MoveObject(keyAtBObject, animPositions.areaBPosition + Vector3.up * 0.5f, moveAnimationTime));
-                
-                // 光らせて注目を促す
-                yield return StartCoroutine(GlowEffect(keyAtBObject));
-            }
+            // 共通鍵を表示状態に設定
+            symmetricKey.SetActive(true);
+            Debug.Log("共通鍵を表示状態に設定");
+            
+            // エリアBの地面位置から開始（Y座標を低めに設定）
+            Vector3 startPosition = new Vector3(animPositions.areaBPosition.x, 0.5f, animPositions.areaBPosition.z);
+            symmetricKey.transform.position = startPosition;
+            Debug.Log($"共通鍵を開始位置に配置: {startPosition}");
+            
+            // 少し待機
+            yield return new WaitForSeconds(0.5f);
+            
+            // エリアBの適切な高さまで上昇
+            Vector3 targetPosition = new Vector3(animPositions.areaBPosition.x, animPositions.areaBPosition.y + 1f, animPositions.areaBPosition.z);
+            Debug.Log($"共通鍵を目標位置に移動開始: {targetPosition}");
+            
+            // 滑らかに上昇
+            yield return StartCoroutine(MoveObject(symmetricKey, targetPosition, moveAnimationTime / 2));
+            
+            // 光らせるエフェクト
+            yield return StartCoroutine(GlowEffect(symmetricKey));
+            
+            // 表示完了フラグを設定
+            isSymmetricKeyShownAtB = true;
+            Debug.Log("共通鍵のエリアB表示完了フラグを設定");
+            
+            Debug.Log("ShowSymmetricKeyAtB完了");
         }
-    }
-    
-    /// <summary>
-    /// エリアBに事前配布済みの鍵を示すインジケーターを作成
-    /// </summary>
-    private GameObject CreateKeyIndicatorAtB()
-    {
-        if (symmetricKey == null) return null;
-        
-        // 元の鍵オブジェクトを複製して同じ見た目のインジケーターを作成
-        GameObject keyIndicator = Instantiate(symmetricKey);
-        keyIndicator.name = "SymmetricKeyAtB";
-        
-        // 少し色を変えて区別できるようにする（オプション）
-        Renderer indicatorRenderer = keyIndicator.GetComponent<Renderer>();
-        if (indicatorRenderer != null && indicatorRenderer.material != null)
+        else
         {
-            // 元のマテリアルをコピーして、色だけ少し変更
-            Material newMaterial = new Material(indicatorRenderer.material);
-            Color keyColor = newMaterial.color;
-            keyColor.g = Mathf.Min(1f, keyColor.g + 0.2f); // 緑を少し強くして区別
-            newMaterial.color = keyColor;
-            indicatorRenderer.material = newMaterial;
+            Debug.LogWarning("共通鍵オブジェクトが見つかりません");
         }
-        
-        return keyIndicator;
     }
     
     private IEnumerator DecryptDataAtB()
     {
-        if (encryptedDataCube != null && dataCube != null)
+        Debug.Log("DecryptDataAtB開始");
+        
+        if (encryptedDataCube != null && symmetricKey != null && dataCube != null)
         {
-            Vector3 position = encryptedDataCube.transform.position;
-            yield return StartCoroutine(MoveObject(encryptedDataCube, animPositions.decryptionPositionB, moveAnimationTime / 2));
+            // エリアBの位置を取得
+            Vector3 areaBPosition = animPositions.areaBPosition;
             
-            // エリアBの鍵も復号位置に移動
-            if (keyAtBObject != null)
+            // 共通鍵を復号位置に移動（必要に応じて）
+            Vector3 keyPosition = areaBPosition + Vector3.up * 1f;
+            if (Vector3.Distance(symmetricKey.transform.position, keyPosition) > 0.5f)
             {
-                yield return StartCoroutine(MoveObject(keyAtBObject, animPositions.decryptionPositionB + Vector3.up * 0.5f, moveAnimationTime / 2));
+                yield return StartCoroutine(MoveObject(symmetricKey, keyPosition, moveAnimationTime / 2));
             }
             
+            // 復号エフェクト
+            StartCoroutine(GlowEffect(symmetricKey));
             yield return StartCoroutine(GlowEffect(encryptedDataCube));
             
-            // 復号化
+            // 暗号キューブの現在位置を記録
+            Vector3 currentPosition = encryptedDataCube.transform.position;
+            
+            // 暗号キューブをフェードアウト
             yield return StartCoroutine(FadeOut(encryptedDataCube));
             encryptedDataCube.SetActive(false);
             
-            dataCube.transform.position = position;
+            // データキューブを同じ位置にフェードイン
+            dataCube.transform.position = currentPosition;
             dataCube.SetActive(true);
             yield return StartCoroutine(FadeIn(dataCube));
             
-            // エリアBの鍵インジケーターを削除
-            if (keyAtBObject != null)
-            {
-                yield return StartCoroutine(FadeOut(keyAtBObject));
-                Destroy(keyAtBObject);
-                keyAtBObject = null;
-            }
+            Debug.Log("DecryptDataAtB完了");
+        }
+        else
+        {
+            Debug.LogWarning("復号に必要なオブジェクト（暗号キューブ、データキューブ、共通鍵）が見つかりません");
         }
     }
     
@@ -1347,6 +1427,28 @@ public class CryptoAnimationManager : MonoBehaviour
     }
     
     /// <summary>
+    /// ハイブリッド暗号：エリアAで共通鍵を生成
+    /// </summary>
+    private IEnumerator CreateHybridSymmetricKeyAtA()
+    {
+        Debug.Log("ハイブリッド暗号：エリアAで共通鍵生成");
+        
+        if (sessionKey != null)
+        {
+            // セッション鍵（共通鍵として使用）を表示状態にする
+            sessionKey.SetActive(true);
+            
+            // エリアAの共通鍵作成位置に配置
+            sessionKey.transform.position = animPositions.areaAPosition + Vector3.up * 2f;
+            
+            // 共通鍵生成エフェクト
+            yield return StartCoroutine(GlowEffect(sessionKey));
+            
+            Debug.Log("ハイブリッド暗号：共通鍵生成完了");
+        }
+    }
+    
+    /// <summary>
     /// ハイブリッド暗号：公開鍵をエリアBからAに転送
     /// </summary>
     private IEnumerator TransferHybridPublicKeyBtoA()
@@ -1369,47 +1471,102 @@ public class CryptoAnimationManager : MonoBehaviour
     }
     
     /// <summary>
-    /// ハイブリッド暗号：エリアAで共通鍵を公開鍵で暗号化
+    /// ハイブリッド暗号：エリアAで共通鍵を使ってデータを暗号化
+    /// </summary>
+    private IEnumerator EncryptDataWithSymmetricAtA()
+    {
+        Debug.Log("ハイブリッド暗号：エリアAで共通鍵を使ってデータを暗号化");
+        
+        if (dataCube != null && sessionKey != null)
+        {
+            // データキューブをエリアAの位置に移動（必要に応じて）
+            Vector3 encryptPosition = animPositions.areaAPosition;
+            if (Vector3.Distance(dataCube.transform.position, encryptPosition) > 1f)
+            {
+                yield return StartCoroutine(MoveObject(dataCube, encryptPosition, moveAnimationTime / 2));
+            }
+            
+            // セッション鍵（共通鍵）を暗号化位置近くに移動
+            Vector3 keyPosition = encryptPosition + Vector3.up * 1f;
+            yield return StartCoroutine(MoveObject(sessionKey, keyPosition, moveAnimationTime / 2));
+            
+            // 暗号化エフェクト
+            StartCoroutine(GlowEffect(sessionKey));
+            yield return StartCoroutine(GlowEffect(dataCube));
+            
+            // データキューブを暗号キューブに変換
+            Vector3 currentPosition = dataCube.transform.position;
+            yield return StartCoroutine(FadeOut(dataCube));
+            dataCube.SetActive(false);
+            
+            encryptedDataCube.transform.position = currentPosition;
+            encryptedDataCube.SetActive(true);
+            yield return StartCoroutine(FadeIn(encryptedDataCube));
+            
+            Debug.Log("ハイブリッド暗号：データの暗号化完了");
+        }
+    }
+    
+    /// <summary>
+    /// ハイブリッド暗号：エリアAで公開鍵を使って共通鍵を暗号化
     /// </summary>
     private IEnumerator EncryptSymmetricKeyWithPublicAtA()
     {
-        Debug.Log("ハイブリッド暗号：共通鍵を公開鍵で暗号化");
+        Debug.Log("ハイブリッド暗号：エリアAで公開鍵を使って共通鍵を暗号化");
         
         if (sessionKey != null && publicKey != null)
         {
-            // セッション鍵を表示
-            sessionKey.SetActive(true);
+            // セッション鍵と公開鍵を暗号化位置に移動
+            Vector3 encryptPosition = animPositions.areaAPosition + Vector3.up * 2f;
             
-            // エリアAの暗号化位置に移動
-            yield return StartCoroutine(MoveObject(sessionKey, animPositions.hybridKeyEncryptA, moveAnimationTime / 2));
-            yield return StartCoroutine(MoveObject(publicKey, animPositions.hybridKeyEncryptA + Vector3.up, moveAnimationTime / 2));
+            yield return StartCoroutine(MoveObject(sessionKey, encryptPosition, moveAnimationTime / 2));
+            yield return StartCoroutine(MoveObject(publicKey, encryptPosition + Vector3.right, moveAnimationTime / 2));
             
-            // 暗号化エフェクト
+            // 公開鍵暗号化エフェクト
             StartCoroutine(GlowEffect(publicKey));
             yield return StartCoroutine(GlowEffect(sessionKey));
+            
+            // セッション鍵の色を変更して暗号化済みを表現
+            Renderer sessionRenderer = sessionKey.GetComponent<Renderer>();
+            if (sessionRenderer != null && encryptedMaterial != null)
+            {
+                sessionRenderer.material = encryptedMaterial;
+            }
             
             Debug.Log("ハイブリッド暗号：共通鍵の暗号化完了");
         }
     }
     
     /// <summary>
-    /// ハイブリッド暗号：暗号化された共通鍵をエリアBに転送
+    /// ハイブリッド暗号：暗号化された鍵とデータをエリアBに転送
     /// </summary>
     private IEnumerator TransferEncryptedKeyAtoB()
     {
-        Debug.Log("ハイブリッド暗号：暗号化された共通鍵を転送");
+        Debug.Log("ハイブリッド暗号：暗号化された鍵とデータをエリアBに転送");
         
+        Vector3 targetPosition = animPositions.areaBPosition;
+        
+        // 暗号化されたセッション鍵を転送
         if (sessionKey != null)
         {
-            // 暗号化された共通鍵をエリアBに転送
-            yield return StartCoroutine(MoveObjectArc(sessionKey, animPositions.areaBPosition + Vector3.up, 
+            StartCoroutine(MoveObjectArc(sessionKey, targetPosition + Vector3.up * 2f, 
                 animPositions.transferDuration, animPositions.transferArcHeight));
-            
-            // 転送完了エフェクト
-            yield return StartCoroutine(GlowEffect(sessionKey));
-            
-            Debug.Log("ハイブリッド暗号：暗号化された共通鍵の転送完了");
         }
+        
+        // 暗号化されたデータキューブを転送
+        if (encryptedDataCube != null)
+        {
+            yield return StartCoroutine(MoveObjectArc(encryptedDataCube, targetPosition, 
+                animPositions.transferDuration, animPositions.transferArcHeight));
+        }
+        
+        // 転送完了エフェクト
+        if (transferEffect != null)
+        {
+            Instantiate(transferEffect, targetPosition, Quaternion.identity);
+        }
+        
+        Debug.Log("ハイブリッド暗号：転送完了");
     }
     
     /// <summary>
@@ -1417,101 +1574,93 @@ public class CryptoAnimationManager : MonoBehaviour
     /// </summary>
     private IEnumerator DecryptSymmetricKeyAtB()
     {
-        Debug.Log("ハイブリッド暗号：秘密鍵で共通鍵を復号");
+        Debug.Log("ハイブリッド暗号：エリアBで秘密鍵を使って共通鍵を復号");
         
         if (sessionKey != null && privateKey != null)
         {
-            // 復号位置に移動
-            yield return StartCoroutine(MoveObject(privateKey, animPositions.privateKeyDecryptB, moveAnimationTime / 2));
-            yield return StartCoroutine(MoveObject(sessionKey, animPositions.privateKeyDecryptB + Vector3.up * 0.5f, moveAnimationTime / 2));
+            // 秘密鍵を復号位置に移動
+            Vector3 decryptPosition = animPositions.areaBPosition + Vector3.up * 2f;
+            yield return StartCoroutine(MoveObject(privateKey, decryptPosition + Vector3.left, moveAnimationTime / 2));
             
             // 復号エフェクト
             StartCoroutine(GlowEffect(privateKey));
             yield return StartCoroutine(GlowEffect(sessionKey));
             
+            // セッション鍵の見た目を元に戻す（復号済みを表現）
+            Renderer sessionRenderer = sessionKey.GetComponent<Renderer>();
+            if (sessionRenderer != null && originalMaterials.ContainsKey(sessionKey))
+            {
+                sessionRenderer.material = originalMaterials[sessionKey];
+            }
+            
             Debug.Log("ハイブリッド暗号：共通鍵の復号完了");
         }
-    }
-    
-    /// <summary>
-    /// ハイブリッド暗号：エリアAで共通鍵を使ってデータを暗号化
-    /// </summary>
-    private IEnumerator EncryptDataWithSymmetricAtA()
-    {
-        Debug.Log("ハイブリッド暗号：共通鍵でデータを暗号化");
         
-        if (dataCube != null && sessionKey != null)
-        {
-            // データ暗号化位置に移動
-            yield return StartCoroutine(MoveObject(dataCube, animPositions.hybridDataEncryptA, moveAnimationTime / 2));
-            yield return StartCoroutine(MoveObject(sessionKey, animPositions.hybridDataEncryptA + Vector3.up, moveAnimationTime / 2));
-            
-            // 暗号化エフェクト
-            yield return StartCoroutine(GlowEffect(dataCube));
-            
-            // データを暗号化キューブに変換
-            yield return StartCoroutine(TransformToEncrypted());
-            
-            Debug.Log("ハイブリッド暗号：データの暗号化完了");
-        }
+        yield return new WaitForSeconds(1f);
     }
     
     /// <summary>
-    /// ハイブリッド暗号：暗号化データをエリアBに転送
-    /// </summary>
-    private IEnumerator TransferHybridDataAtoB()
-    {
-        Debug.Log("ハイブリッド暗号：暗号化データを転送");
-        
-        if (encryptedDataCube != null)
-        {
-            // 暗号化データをエリアBに転送
-            yield return StartCoroutine(MoveObjectArc(encryptedDataCube, animPositions.areaBPosition, 
-                animPositions.transferDuration, animPositions.transferArcHeight));
-            
-            // 転送完了エフェクト
-            yield return StartCoroutine(GlowEffect(encryptedDataCube));
-            
-            Debug.Log("ハイブリッド暗号：暗号化データの転送完了");
-        }
-    }
-    
-    /// <summary>
-    /// ハイブリッド暗号：エリアBで共通鍵を使ってデータを復号
+    /// ハイブリッド暗号：復号した共通鍵でデータを復号
     /// </summary>
     private IEnumerator DecryptHybridDataAtB()
     {
-        Debug.Log("ハイブリッド暗号：共通鍵でデータを復号");
+        Debug.Log("ハイブリッド暗号：復号した共通鍵でデータを復号");
         
         if (encryptedDataCube != null && sessionKey != null && dataCube != null)
         {
-            // 復号位置に移動
-            yield return StartCoroutine(MoveObject(encryptedDataCube, animPositions.areaBPosition, moveAnimationTime / 2));
+            // セッション鍵をデータ復号位置に移動
+            Vector3 decryptPosition = animPositions.areaBPosition + Vector3.up * 1f;
+            yield return StartCoroutine(MoveObject(sessionKey, decryptPosition, moveAnimationTime / 2));
             
-            // エリアBの復号済み共通鍵を復号位置に移動
-            if (sessionKey != null)
-            {
-                yield return StartCoroutine(MoveObject(sessionKey, animPositions.areaBPosition + Vector3.up * 0.5f, moveAnimationTime / 2));
-            }
-            
-            // 復号エフェクト
+            // データ復号エフェクト
             StartCoroutine(GlowEffect(sessionKey));
             yield return StartCoroutine(GlowEffect(encryptedDataCube));
             
-            // 暗号キューブをデータキューブに戻す
+            // 暗号キューブの現在位置を記録
             Vector3 currentPosition = encryptedDataCube.transform.position;
             
+            // 暗号キューブをフェードアウト
             yield return StartCoroutine(FadeOut(encryptedDataCube));
             encryptedDataCube.SetActive(false);
             
+            // データキューブを同じ位置にフェードイン
             dataCube.transform.position = currentPosition;
             dataCube.SetActive(true);
             yield return StartCoroutine(FadeIn(dataCube));
             
-            Debug.Log("ハイブリッド暗号：データの復号完了");
+            // 最終完了エフェクト - すべてのオブジェクトを光らせる
+            if (dataCube != null) StartCoroutine(GlowEffect(dataCube));
+            if (sessionKey != null) StartCoroutine(GlowEffect(sessionKey));
+            if (publicKey != null) StartCoroutine(GlowEffect(publicKey));
+            if (privateKey != null) StartCoroutine(GlowEffect(privateKey));
+            
+            Debug.Log("ハイブリッド暗号：全プロセス完了");
         }
+        
+        yield return new WaitForSeconds(2f);
     }
-
+    
+    /// <summary>
+    /// ハイブリッド暗号：全体のデータ転送アニメーション
+    /// </summary>
+    private IEnumerator TransferHybridDataAtoB()
+    {
+        Debug.Log("ハイブリッド暗号：ハイブリッドデータ転送");
+        
+        // 既に個別転送が完了しているため、確認エフェクトのみ
+        Vector3 targetPosition = animPositions.areaBPosition;
+        
+        if (transferEffect != null)
+        {
+            Instantiate(transferEffect, targetPosition, Quaternion.identity);
+        }
+        
+        yield return new WaitForSeconds(1f);
+        Debug.Log("ハイブリッド暗号：データ転送確認完了");
+    }
+    
+    // === 基本的なアニメーション補助関数 ===
+    
     /// <summary>
     /// 鍵表示時のエフェクトを実行するコルーチン
     /// </summary>
@@ -1635,6 +1784,10 @@ public class CryptoAnimationManager : MonoBehaviour
         {
             transferQueue.Clear();
         }
+
+        // 演出状態フラグをリセット
+        isSymmetricKeyShownAtB = false;
+        Debug.Log("共通鍵表示フラグをリセット");
         
         Debug.Log("CryptoAnimationManager: オブジェクトリセット完了");
     }

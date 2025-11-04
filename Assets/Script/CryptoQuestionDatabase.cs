@@ -196,133 +196,133 @@ public static class CryptoQuestionDatabase
             }
         };
 
-        // ハイブリッド暗号の問題（新しい手順に対応、8問に拡張）
+        // ハイブリッド暗号の問題（正しい手順順序に修正）
         questionDatabase[CryptoGameManager.CryptoType.Hybrid] = new List<CryptoQuestion>
         {
             // 手順1: 公開鍵と秘密鍵を作成（エリアb）
             new CryptoQuestion
             {
-                questionText = "ハイブリッド暗号において、受信者（エリアB）が最初に作成するのは？",
-                answers = new string[] { "共通鍵のみ", "公開鍵と秘密鍵のペア", "デジタル証明書", "ハッシュ値" },
+                questionText = "ハイブリッド暗号において、受信者（エリアB）が最初に作成するものは？",
+                answers = new string[] { "共通鍵", "公開鍵と秘密鍵のペア", "セッション鍵", "デジタル署名" },
                 correctAnswerIndex = 1,
-                explanations = new string[]
+                explanations = new string[] 
                 {
-                    "❌ 共通鍵は後で使用されます。",
-                    "✅ 正解！ハイブリッド暗号でも公開鍵暗号の仕組みを利用します。",
-                    "❌ 証明書は認証で使用されます。",
-                    "❌ ハッシュ値は整合性確認で使用されます。"
+                    "❌ 共通鍵は送信者が作成します。",
+                    "✅ 正解！受信者が公開鍵と秘密鍵のペアを作成します。",
+                    "❌ セッション鍵は送信者が作成します。",
+                    "❌ デジタル署名は認証に使用されます。"
                 },
                 animationType = "create_hybrid_keypair_b"
             },
             
-            // 手順2: 公開鍵を送信（エリアbからa）
+            // 手順2: 公開鍵を送信（エリアbからaへ）
             new CryptoQuestion
             {
-                questionText = "エリアBからエリアAに公開鍵を送信する理由は？",
-                answers = new string[] { "データ暗号化のため", "共通鍵の暗号化のため", "身元確認のため", "速度向上のため" },
+                questionText = "エリアBで作成した鍵ペアのうち、エリアAに送信するものは？",
+                answers = new string[] { "秘密鍵", "公開鍵", "共通鍵", "両方の鍵" },
                 correctAnswerIndex = 1,
                 explanations = new string[]
                 {
-                    "❌ データは共通鍵で暗号化されます。",
-                    "✅ 正解！ハイブリッド暗号では共通鍵を公開鍵で暗号化します。",
-                    "❌ 身元確認は別の仕組みです。",
-                    "❌ 速度向上が目的ではありません。"
+                    "❌ 秘密鍵は絶対に外部に送信してはいけません。",
+                    "✅ 正解！公開鍵は公開されても安全な鍵なので送信します。",
+                    "❌ 共通鍵はまだ作成されていません。",
+                    "❌ 秘密鍵は秘密にしておく必要があります。"
                 },
                 animationType = "transfer_hybrid_public_btoa"
             },
             
-            // 手順3: 公開鍵で共通鍵を暗号化（エリアa）
+            // 手順3: 共通鍵の生成（エリアa）
             new CryptoQuestion
             {
-                questionText = "エリアAで公開鍵を使って共通鍵を暗号化します。この方法の利点は？",
-                answers = new string[] { "高速なデータ処理", "安全な鍵配布", "計算負荷の軽減", "データ圧縮" },
+                questionText = "送信者（エリアA）が大量のデータを効率的に暗号化するために次に生成するものは？",
+                answers = new string[] { "新しい公開鍵", "共通鍵（セッション鍵）", "デジタル署名", "ハッシュ値" },
                 correctAnswerIndex = 1,
                 explanations = new string[]
                 {
-                    "❌ データ処理自体は共通鍵で行います。",
-                    "✅ 正解！公開鍵暗号により共通鍵を安全に送信できます。",
-                    "❌ 公開鍵暗号は計算負荷が高いです。",
-                    "❌ データ圧縮とは関係ありません。"
+                    "❌ 公開鍵は既に受信者から受け取っています。",
+                    "✅ 正解！送信者がセッション鍵（一時的な共通鍵）を生成します。",
+                    "❌ デジタル署名は認証に使用されます。",
+                    "❌ ハッシュ値は整合性確認に使用されます。"
                 },
-                animationType = "encrypt_symmetric_with_public_a"
+                animationType = "create_symmetric_key_a"
             },
             
-            // 手順4: 暗号化した鍵を送信（エリアaからb）
+            // 手順4: 共通鍵で平文を暗号化（エリアa）
             new CryptoQuestion
             {
-                questionText = "暗号化された共通鍵をエリアAからエリアBに送信します。受信者はどのように共通鍵を取得しますか？",
-                answers = new string[] { "公開鍵で復号", "秘密鍵で復号", "パスワードで復号", "自動で復号" },
+                questionText = "エリアAで大量のデータを暗号化する際、なぜ共通鍵を使用するのですか？",
+                answers = new string[] { "公開鍵より安全", "処理が高速", "鍵が小さい", "設定が簡単" },
                 correctAnswerIndex = 1,
                 explanations = new string[]
                 {
-                    "❌ 公開鍵では復号できません。",
-                    "✅ 正解！公開鍵で暗号化されたものは秘密鍵で復号します。",
-                    "❌ パスワードは使用しません。",
-                    "❌ 自動では復号できません。"
-                },
-                animationType = "transfer_encrypted_key_atob"
-            },
-            
-            // 手順5: 暗号文を復号（エリアb）
-            new CryptoQuestion
-            {
-                questionText = "エリアBで秘密鍵を使って共通鍵を復号しました。次に必要なのは？",
-                answers = new string[] { "データの送信", "新しい鍵の作成", "暗号化されたデータの受信", "システムの再起動" },
-                correctAnswerIndex = 2,
-                explanations = new string[]
-                {
-                    "❌ データは送信者側で既に準備されています。",
-                    "❌ 新しい鍵は必要ありません。",
-                    "✅ 正解！共通鍵を取得した後、暗号化されたデータを受信します。",
-                    "❌ システムの再起動は不要です。"
-                },
-                animationType = "decrypt_symmetric_key_b"
-            },
-            
-            // 手順6: 平文を共通鍵で暗号化（エリアa)
-            new CryptoQuestion
-            {
-                questionText = "エリアAで実際のデータを共通鍵で暗号化します。共通鍵を使う理由は？",
-                answers = new string[] { "安全性が高い", "処理速度が速い", "鍵配布が簡単", "計算が複雑" },
-                correctAnswerIndex = 1,
-                explanations = new string[]
-                {
-                    "❌ 安全性は公開鍵暗号と同等です。",
-                    "✅ 正解！大容量データの処理には高速な共通鍵暗号が適しています。",
-                    "❌ 鍵配布は公開鍵暗号で解決済みです。",
-                    "❌ 共通鍵暗号は計算が単純です。"
+                    "❌ 安全性は同等ですが、用途が異なります。",
+                    "✅ 正解！共通鍵暗号は公開鍵暗号より処理が高速で大量データに適しています。",
+                    "❌ 鍵のサイズは主な理由ではありません。",
+                    "❌ 設定の簡単さが主な理由ではありません。"
                 },
                 animationType = "encrypt_data_with_symmetric_a"
             },
             
-            // 手順7: 暗号文を送信（エリアaからb)
+            // 手順5: 公開鍵で共通鍵を暗号化（エリアa）
             new CryptoQuestion
             {
-                questionText = "共通鍵で暗号化されたデータをエリアAからエリアBに送信します。この時点で受信者が持っているのは？",
-                answers = new string[] { "公開鍵のみ", "秘密鍵と共通鍵", "共通鍵のみ", "何も持っていない" },
+                questionText = "共通鍵を安全に送信するため、エリアAで公開鍵を使って暗号化するものは？",
+                answers = new string[] { "暗号化済みデータ", "共通鍵自体", "秘密鍵", "受信者の情報" },
                 correctAnswerIndex = 1,
                 explanations = new string[]
                 {
-                    "❌ 公開鍵だけでは復号できません。",
-                    "✅ 正解！受信者は秘密鍵と、それで復号した共通鍵を持っています。",
-                    "❌ 秘密鍵も必要です。",
-                    "❌ 既に鍵を復号しています。"
+                    "❌ データは既に共通鍵で暗号化済みです。",
+                    "✅ 正解！共通鍵を公開鍵で暗号化して安全に送信します。",
+                    "❌ 秘密鍵は暗号化の対象ではありません。",
+                    "❌ 受信者情報の暗号化は不要です。"
                 },
-                animationType = "transfer_hybrid_data_atob"
+                animationType = "encrypt_symmetric_with_public_a"
             },
             
-            // 手順8: 秘密鍵で復号化（エリアb）
+            // 手順6: 暗号化した鍵、暗号文を送信（エリアaからbへ）
             new CryptoQuestion
             {
-                questionText = "エリアBで共通鍵を使って最終的にデータを復号しました。ハイブリッド暗号の最大の利点は？",
-                answers = new string[] { "計算が簡単", "両方の暗号方式の利点を活用", "鍵が一つだけ", "ネットワーク不要" },
+                questionText = "エリアAからエリアBに送信されるものは何ですか？",
+                answers = new string[] { "平文データのみ", "暗号化データと暗号化された共通鍵", "公開鍵のみ", "秘密鍵" },
                 correctAnswerIndex = 1,
                 explanations = new string[]
                 {
-                    "❌ 実際には計算が複雑になります。",
-                    "✅ 正解！公開鍵暗号の安全な鍵配布と共通鍵暗号の高速処理を両立しています。",
-                    "❌ 実際には複数の鍵を使用します。",
-                    "❌ ネットワークは必要です。"
+                    "❌ 平文データは送信されません。",
+                    "✅ 正解！暗号化されたデータと暗号化された共通鍵の両方が送信されます。",
+                    "❌ 公開鍵は既に送信済みです。",
+                    "❌ 秘密鍵は送信されません。"
+                },
+                animationType = "transfer_encrypted_key_atob"
+            },
+            
+            // 手順7: 暗号化した共通鍵を秘密鍵で復号（エリアb）
+            new CryptoQuestion
+            {
+                questionText = "エリアBで暗号化された共通鍵を復号するために使用するものは？",
+                answers = new string[] { "公開鍵", "秘密鍵", "新しい共通鍵", "パスワード" },
+                correctAnswerIndex = 1,
+                explanations = new string[]
+                {
+                    "❌ 公開鍵で暗号化されたものは公開鍵では復号できません。",
+                    "✅ 正解！秘密鍵で暗号化された共通鍵を復号します。",
+                    "❌ 新しい共通鍵では復号できません。",
+                    "❌ パスワードでは復号できません。"
+                },
+                animationType = "decrypt_symmetric_key_b"
+            },
+            
+            // 手順8: 共通鍵を使って暗号文を復号（エリアb）
+            new CryptoQuestion
+            {
+                questionText = "ハイブリッド暗号の最終段階で、エリアBで暗号化されたデータを復号するために使用するものは？",
+                answers = new string[] { "秘密鍵", "公開鍵", "共通鍵", "パスワード" },
+                correctAnswerIndex = 2,
+                explanations = new string[]
+                {
+                    "❌ 秘密鍵は既に共通鍵の復号に使用済みです。",
+                    "❌ 公開鍵はデータの復号には使用されません。",
+                    "✅ 正解！先ほど復号した共通鍵を使ってデータを復号します。",
+                    "❌ パスワードでは暗号化されたデータを復号できません。"
                 },
                 animationType = "decrypt_hybrid_data_b"
             }

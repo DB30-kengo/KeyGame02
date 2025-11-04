@@ -10,8 +10,12 @@ public class CryptoLearningAdapter : MonoBehaviour
     [Header("3D回答オブジェクト")]
     public GameObject answerCube1;
     public GameObject answerCube2;
+    public GameObject answerCube3;  // 新しく追加
+    public GameObject answerCube4;  // 新しく追加
     public TextMesh answerText1;
     public TextMesh answerText2;
+    public TextMesh answerText3;    // 新しく追加
+    public TextMesh answerText4;    // 新しく追加
     
     [Header("UI統合")]
     public GameObject cryptoUI;
@@ -63,16 +67,34 @@ public class CryptoLearningAdapter : MonoBehaviour
             
         if (answerCube2 != null)
             answerCube2.SetActive(cryptoMode);
+            
+        if (answerCube3 != null)
+            answerCube3.SetActive(cryptoMode);
+            
+        if (answerCube4 != null)
+            answerCube4.SetActive(cryptoMode);
     }
     
-    // 3D回答オブジェクトのテキスト更新
-    public void UpdateAnswerTexts(string answer1, string answer2)
+    // 3D回答オブジェクトのテキスト更新（四択対応）
+    public void UpdateAnswerTexts(string answer1, string answer2, string answer3, string answer4)
     {
         if (answerText1 != null)
             answerText1.text = answer1;
             
         if (answerText2 != null)
             answerText2.text = answer2;
+            
+        if (answerText3 != null)
+            answerText3.text = answer3;
+            
+        if (answerText4 != null)
+            answerText4.text = answer4;
+    }
+
+    // 3D回答オブジェクトのテキスト更新（二択互換）
+    public void UpdateAnswerTexts(string answer1, string answer2)
+    {
+        UpdateAnswerTexts(answer1, answer2, "", "");
     }
     
     // 既存のSequentialObjectsManagerから呼び出される

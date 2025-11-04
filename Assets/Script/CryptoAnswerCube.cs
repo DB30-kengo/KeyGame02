@@ -244,6 +244,19 @@ public class CryptoAnswerCube : MonoBehaviour
     {
         if (isSelected || !isActive) return;
         
+        // ゲームマネージャーの状態を確認
+        if (gameManager == null)
+        {
+            Debug.LogWarning("GameManagerが見つかりません。再検索を実行します。");
+            gameManager = FindObjectOfType<CryptoGameManager>();
+            
+            if (gameManager == null)
+            {
+                Debug.LogError("CryptoGameManagerが見つかりません。ゲームオブジェクトにCryptoGameManagerが設定されているか確認してください。");
+                return;
+            }
+        }
+        
         isSelected = true;
         isActive = false;
         
@@ -257,13 +270,21 @@ public class CryptoAnswerCube : MonoBehaviour
             uiManager.AnimateButtonPress(null); // 3D用のアニメーション
         }
         
+        Debug.Log($"回答選択準備完了: {answerIndex} - {answerText}");
+        
         // ゲームマネージャーに回答を通知
-        if (gameManager != null)
+        try
         {
             gameManager.OnAnswerSelected(answerIndex);
+            Debug.Log($"回答選択完了: {answerIndex} - {answerText}");
         }
-        
-        Debug.Log($"回答選択: {answerIndex} - {answerText}");
+        catch (System.Exception e)
+        {
+            Debug.LogError($"回答選択でエラーが発生: {e.Message}");
+            // エラーが発生した場合はキューブをリセット
+            ResetCube();
+            return;
+        }
         
         // 選択後の処理
         StartCoroutine(HandlePostSelection());
