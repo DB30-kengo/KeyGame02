@@ -34,6 +34,13 @@ public class CryptoGameManager : MonoBehaviour
     [Header("3D Animation System")]
     public CryptoAnimationManager animationManager;
     
+    [Header("Player Management")]
+    [Tooltip("プレイヤーオブジェクト（正解時に位置をリセット）")]
+    public Transform player;
+    
+    [Tooltip("プレイヤーの復帰位置")]
+    public Vector3 playerResetPosition = new Vector3(0, 10, 5);
+    
     // ゲーム状態
     private CryptoType[] currentGameSet;
     private int currentQuestionIndex = 0;
@@ -68,6 +75,42 @@ public class CryptoGameManager : MonoBehaviour
             if (animationManager == null)
             {
                 animationManager = FindObjectOfType<CryptoAnimationManager>();
+            }
+        }
+        
+        // プレイヤーオブジェクトが未設定の場合は自動検索
+        if (player == null)
+        {
+            // まずPlayerタグで検索
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                player = playerObj.transform;
+                Debug.Log($"プレイヤーを自動検出しました: {player.name} (Playerタグ)");
+            }
+            else
+            {
+                // FirstPersonControllerという名前で検索
+                playerObj = GameObject.Find("FirstPersonController");
+                if (playerObj != null)
+                {
+                    player = playerObj.transform;
+                    Debug.Log($"プレイヤーを自動検出しました: {player.name} (名前検索)");
+                }
+                else
+                {
+                    // CharacterControllerコンポーネントがついているオブジェクトを検索
+                    CharacterController characterController = FindObjectOfType<CharacterController>();
+                    if (characterController != null)
+                    {
+                        player = characterController.transform;
+                        Debug.Log($"プレイヤーを自動検出しました: {player.name} (CharacterController)");
+                    }
+                    else
+                    {
+                        Debug.LogWarning("プレイヤーオブジェクトが見つかりません。Inspectorで手動設定してください。");
+                    }
+                }
             }
         }
         
@@ -443,6 +486,17 @@ public class CryptoGameManager : MonoBehaviour
     
     private IEnumerator RetryCurrentQuestion(string explanation)
     {
+        // ゲーム状態の安全性をチェック
+        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length || currentQuestionIndex < 0)
+        {
+            Debug.LogError($"RetryCurrentQuestion: 無効なゲーム状態。currentGameSet: {(currentGameSet != null ? "存在" : "null")}, currentQuestionIndex: {currentQuestionIndex}, 配列長: {(currentGameSet?.Length ?? 0)}");
+            
+            // ゲーム状態を強制的にリセット
+            Debug.Log("ゲーム状態をリセットしています...");
+            yield return StartCoroutine(ForceGameReset());
+            yield break;
+        }
+
         // 解説を短時間表示
         if (explanationPanel != null && explanationText != null)
         {
@@ -464,12 +518,68 @@ public class CryptoGameManager : MonoBehaviour
             questionText.color = Color.white;
         }
         
+        // 再度安全性をチェックしてから問題を再表示
+        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length || currentQuestionIndex < 0)
+        {
+            Debug.LogError("問題再表示時にもゲーム状態が無効です。ゲームを再開始します。");
+            yield return StartCoroutine(ForceGameReset());
+            yield break;
+        }
+        
         // 同じ問題を再表示（ステップを進めない）
         CryptoType currentType = currentGameSet[currentQuestionIndex];
         CryptoQuestion question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
+        
+        if (question == null)
+        {
+            Debug.LogError($"問題データが取得できません。CryptoType: {currentType}, StepIndex: {currentStepIndex}");
+            yield return StartCoroutine(ForceGameReset());
+            yield break;
+        }
+        
         DisplayQuestion(question);
         
         Debug.Log("同じ問題を再出題");
+    }
+
+    /// <summary>
+    /// ゲーム状態を強制的にリセットする
+    /// </summary>
+    private IEnumerator ForceGameReset()
+    {
+        Debug.Log("強制的にゲーム状態をリセット中...");
+        
+        // UI表示をクリア
+        if (questionText != null)
+        {
+            questionText.text = "ゲームを再開始しています...";
+            questionText.color = Color.white;
+        }
+        
+        // 回答キューブを非表示
+        if (answerCubes != null)
+        {
+            foreach (var cube in answerCubes)
+            {
+                if (cube != null)
+                    cube.SetActive(false);
+            }
+        }
+        
+        // UIボタンを非表示
+        if (answerButtons != null)
+        {
+            foreach (Button btn in answerButtons)
+            {
+                if (btn != null)
+                    btn.gameObject.SetActive(false);
+            }
+        }
+        
+        yield return new WaitForSeconds(1f);
+        
+        // ゲームを新たに開始
+        StartNewGameSet();
     }
     
     private IEnumerator DelayedCorrectAnswer()
@@ -498,11 +608,134 @@ public class CryptoGameManager : MonoBehaviour
         OnIncorrectAnswer(explanation);
     }
     
+    /// <summary>
+    /// プレイヤーの位置をリセットする（CharacterController対応・床抜け防止・ThirdPersonController対応）
+    /// </summary>
+    /// <param name="targetPosition">リセット先の位置</param>
+    private IEnumerator ResetPlayerPosition(Vector3 targetPosition)
+    {
+        if (player == null)
+        {
+            Debug.LogWarning("プレイヤーオブジェクトが設定されていません");
+            yield break;
+        }
+
+        Debug.Log($"プレイヤーを {targetPosition} にリセット中...");
+
+        // ThirdPersonControllerを一時的に無効化（CharacterController.Moveエラーを防ぐ）
+        MonoBehaviour targetController = null;
+        bool wasThirdPersonControllerEnabled = false;
+        
+        // StarterAssetsのThirdPersonControllerを検索して無効化
+        MonoBehaviour[] components = player.GetComponents<MonoBehaviour>();
+        
+        foreach (var component in components)
+        {
+            if (component.GetType().Name == "ThirdPersonController")
+            {
+                targetController = component;
+                wasThirdPersonControllerEnabled = component.enabled;
+                component.enabled = false;
+                Debug.Log("ThirdPersonControllerを一時的に無効化");
+                break;
+            }
+        }
+
+        // CharacterControllerがある場合の特別処理
+        CharacterController characterController = player.GetComponent<CharacterController>();
+        if (characterController != null)
+        {
+            Debug.Log("CharacterController検出 - 安全なリセット処理を実行");
+            
+            // CharacterControllerを一時的に無効化
+            characterController.enabled = false;
+            yield return new WaitForFixedUpdate(); // 物理更新を待つ
+            
+            // 目標位置を少し高めに設定（床抜けを防ぐ）
+            Vector3 safeTargetPosition = targetPosition;
+            safeTargetPosition.y += 0.5f; // 0.5m高く設定
+            
+            // 位置を設定
+            player.position = safeTargetPosition;
+            yield return new WaitForFixedUpdate(); // 物理更新を待つ
+            
+            // CharacterControllerを再有効化
+            characterController.enabled = true;
+            yield return new WaitForFixedUpdate(); // 物理更新を待つ
+            
+            // 地面に向かってレイキャストして正確な地面位置を取得
+            RaycastHit hit;
+            Vector3 rayStart = safeTargetPosition + Vector3.up * 2f; // さらに高い位置から開始
+            
+            if (Physics.Raycast(rayStart, Vector3.down, out hit, 10f))
+            {
+                // 地面が見つかった場合、その位置に設定（CharacterControllerの高さを考慮）
+                Vector3 groundPosition = hit.point;
+                groundPosition.y += characterController.height * 0.5f + characterController.skinWidth;
+                
+                // CharacterController.Moveを使用して安全に移動
+                Vector3 moveVector = groundPosition - player.position;
+                characterController.Move(moveVector);
+                
+                Debug.Log($"地面検出成功 - 正確な位置に配置: {groundPosition}");
+            }
+            else
+            {
+                // 地面が見つからない場合、元の目標位置を使用
+                Debug.LogWarning("地面が検出されませんでした。目標位置をそのまま使用します。");
+                Vector3 moveVector = targetPosition - player.position;
+                characterController.Move(moveVector);
+            }
+            
+            Debug.Log("CharacterController付きプレイヤーの位置リセット完了");
+        }
+        else
+        {
+            // Rigidbodyがある場合の処理
+            Rigidbody rb = player.GetComponent<Rigidbody>();
+            if (rb != null)
+            {
+                Debug.Log("Rigidbody検出 - 物理リセット処理を実行");
+                
+                // 物理的な速度をリセット
+                rb.linearVelocity = Vector3.zero;
+                rb.angularVelocity = Vector3.zero;
+                
+                // 位置を設定
+                rb.MovePosition(targetPosition);
+                
+                Debug.Log("Rigidbody付きプレイヤーの位置リセット完了");
+            }
+            else
+            {
+                // 通常のTransformによる移動
+                player.position = targetPosition;
+                Debug.Log("Transform直接操作でプレイヤーの位置リセット完了");
+            }
+        }
+
+        // ThirdPersonControllerを再有効化
+        if (targetController != null && wasThirdPersonControllerEnabled)
+        {
+            yield return new WaitForFixedUpdate(); // 物理更新を待つ
+            targetController.enabled = true;
+            Debug.Log("ThirdPersonControllerを再有効化");
+        }
+
+        // カメラとプレイヤーコントローラーが安定するまで待機
+        yield return new WaitForSeconds(0.2f);
+        
+        Debug.Log($"プレイヤーリセット完了 - 最終位置: {player.position}");
+    }
+
     private void OnCorrectAnswer()
     {
         // 理解度を更新
         CryptoType currentType = currentGameSet[currentQuestionIndex];
         progressTracker.UpdateProgress(currentType, 20f); // 5問構成なので20%ずつ
+        
+        // プレイヤーの位置をリセット（コルーチンで実行）
+        StartCoroutine(ResetPlayerPosition(playerResetPosition));
         
         // 次のステップまたは次の問題へ
         currentStepIndex++;

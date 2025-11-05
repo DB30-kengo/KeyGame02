@@ -244,7 +244,7 @@ public static class CryptoQuestionDatabase
                     "❌ デジタル署名は認証に使用されます。",
                     "❌ ハッシュ値は整合性確認に使用されます。"
                 },
-                animationType = "create_symmetric_key_a"
+                animationType = "create_hybrid_symmetric_key_a"
             },
             
             // 手順4: 共通鍵で平文を暗号化（エリアa）
@@ -292,7 +292,7 @@ public static class CryptoQuestionDatabase
                     "❌ 公開鍵は既に送信済みです。",
                     "❌ 秘密鍵は送信されません。"
                 },
-                animationType = "transfer_encrypted_key_atob"
+                animationType = "transfer_encrypted_data_and_session_key_to_b"
             },
             
             // 手順7: 暗号化した共通鍵を秘密鍵で復号（エリアb）
@@ -308,7 +308,7 @@ public static class CryptoQuestionDatabase
                     "❌ 新しい共通鍵では復号できません。",
                     "❌ パスワードでは復号できません。"
                 },
-                animationType = "decrypt_symmetric_key_b"
+                animationType = "decrypt_session_key_to_symmetric_at_b"
             },
             
             // 手順8: 共通鍵を使って暗号文を復号（エリアb）

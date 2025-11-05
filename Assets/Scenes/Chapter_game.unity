@@ -4831,8 +4831,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameSetDuration: 180
   questionsPerSet: 3
-  enableSymmetricKey: 0
-  enablePublicKey: 0
+  enableSymmetricKey: 1
+  enablePublicKey: 1
   enableHybrid: 1
   questionText: {fileID: 1633949100}
   progressText: {fileID: 900029165}
@@ -4858,6 +4858,8 @@ MonoBehaviour:
   - {fileID: 2005906455}
   - {fileID: 532619958}
   animationManager: {fileID: 819720816}
+  player: {fileID: 0}
+  playerResetPosition: {x: 0, y: -1, z: 5}
 --- !u!114 &819720813
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -5182,7 +5184,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\u30BB\u30C3\u30B7\u30E7\u30F3\u9375"
+  m_Text: "\u6697\u53F7\u5316\u3057\u305F\u5171\u901A\u9375\n\uFF08\u30BB\u30C3\u30B7\u30E7\u30F3\u9375\uFF09"
 --- !u!222 &829221524
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -12351,7 +12353,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c54d1ac6bc86c407ebd5a9bf37484cce, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  labelText: "\u30BB\u30C3\u30B7\u30E7\u30F3\u9375"
+  labelText: "\u6697\u53F7\u5316\u3057\u3066\u5171\u901A\u9375\n\uFF08\u30BB\u30C3\u30B7\u30E7\u30F3\u9375\uFF09"
   worldCanvas: {fileID: 671510916}
   label: {fileID: 829221523}
   offset: {x: 0, y: 0, z: 0}
