@@ -1,0 +1,229 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// ヒントシーンへの遷移を管理
+/// </summary>
+public class HintSceneTransition : MonoBehaviour
+{
+    [Header("Hint Access Buttons")]
+    [Tooltip("ヒントシーンに遷移するボタン")]
+    public Button generalHintButton;
+    
+    [Tooltip("共通鍵暗号ヒントボタン")]
+    public Button symmetricKeyHintButton;
+    
+    [Tooltip("公開鍵暗号ヒントボタン")]
+    public Button publicKeyHintButton;
+    
+    [Tooltip("ハイブリッド暗号ヒントボタン")]
+    public Button hybridHintButton;
+    
+    [Header("Settings")]
+    [Tooltip("ヒントシーンの名前")]
+    public string hintSceneName = "HintScene";
+    
+    [Tooltip("現在のシーン名（戻る時に使用）")]
+    public string currentSceneName;
+    
+    [Header("Debug Settings")]
+    [Tooltip("デバッグ情報を表示")]
+    public bool showDebugInfo = true;
+    
+    void Start()
+    {
+        // 現在のシーン名を取得
+        currentSceneName = SceneManager.GetActiveScene().name;
+        
+        if (showDebugInfo)
+        {
+            Debug.Log($"[HintSceneTransition] Initialized in scene: {currentSceneName}");
+        }
+        
+        SetupButtons();
+        ValidateScene();
+    }
+    
+    /// <summary>
+    /// ヒントシーンの存在を検証
+    /// </summary>
+    private void ValidateScene()
+    {
+        // Build Settingsでシーンが追加されているかチェック
+        bool sceneExists = false;
+        for (int i = 0; i < SceneManager.sceneCountInBuildSettings; i++)
+        {
+            string scenePath = SceneUtility.GetScenePathByBuildIndex(i);
+            string sceneName = System.IO.Path.GetFileNameWithoutExtension(scenePath);
+            if (sceneName == hintSceneName)
+            {
+                sceneExists = true;
+                break;
+            }
+        }
+        
+        if (!sceneExists)
+        {
+            Debug.LogWarning($"[HintSceneTransition] Warning: Scene '{hintSceneName}' is not found in Build Settings!");
+            Debug.Log("[HintSceneTransition] Please add HintScene to File → Build Settings → Scenes In Build");
+        }
+        else if (showDebugInfo)
+        {
+            Debug.Log($"[HintSceneTransition] Target scene '{hintSceneName}' found in Build Settings.");
+        }
+    }
+    
+    private void SetupButtons()
+    {
+        // 一般ヒントボタン
+        if (generalHintButton != null)
+        {
+            generalHintButton.onClick.AddListener(() => GoToHintScene(-1)); // -1は一般選択
+        }
+        
+        // 各暗号方式のヒントボタン
+        if (symmetricKeyHintButton != null)
+        {
+            symmetricKeyHintButton.onClick.AddListener(() => GoToHintScene(0)); // 共通鍵
+        }
+        
+        if (publicKeyHintButton != null)
+        {
+            publicKeyHintButton.onClick.AddListener(() => GoToHintScene(1)); // 公開鍵
+        }
+        
+        if (hybridHintButton != null)
+        {
+            hybridHintButton.onClick.AddListener(() => GoToHintScene(2)); // ハイブリッド
+        }
+    }
+    
+    /// <summary>
+    /// ヒントシーンに遷移
+    /// </summary>
+    /// <param name="categoryIndex">カテゴリインデックス（-1は選択画面）</param>
+    public void GoToHintScene(int categoryIndex = -1)
+    {
+        if (showDebugInfo)
+        {
+            Debug.Log($"[HintSceneTransition] Transitioning to hint scene with category: {categoryIndex}");
+        }
+        
+        try
+        {
+            // 戻り先シーン情報を保存
+            PlayerPrefs.SetString("ReturnScene", currentSceneName);
+            
+            if (categoryIndex >= 0)
+            {
+                // 特定のカテゴリを保存
+                PlayerPrefs.SetInt("HintCategory", categoryIndex);
+                if (showDebugInfo)
+                {
+                    Debug.Log($"[HintSceneTransition] Set hint category to: {categoryIndex}");
+                }
+            }
+            else
+            {
+                // カテゴリ選択画面を表示
+                PlayerPrefs.DeleteKey("HintCategory");
+                if (showDebugInfo)
+                {
+                    Debug.Log("[HintSceneTransition] Category selection mode");
+                }
+            }
+            
+            PlayerPrefs.Save();
+            
+            // ヒントシーンをロード
+            if (Application.CanStreamedLevelBeLoaded(hintSceneName))
+            {
+                SceneManager.LoadScene(hintSceneName);
+            }
+            else
+            {
+                Debug.LogError($"[HintSceneTransition] Cannot load scene '{hintSceneName}'. Please ensure it's added to Build Settings.");
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[HintSceneTransition] Error during scene transition: {e.Message}");
+        }
+    }
+    
+    /// <summary>
+    /// 戻るボタン用：前のシーンに戻る
+    /// </summary>
+    public void ReturnToPreviousScene()
+    {
+        string returnScene = PlayerPrefs.GetString("ReturnScene", "SampleScene");
+        
+        if (showDebugInfo)
+        {
+            Debug.Log($"[HintSceneTransition] Returning to scene: {returnScene}");
+        }
+        
+        try
+        {
+            if (Application.CanStreamedLevelBeLoaded(returnScene))
+            {
+                SceneManager.LoadScene(returnScene);
+            }
+            else
+            {
+                Debug.LogWarning($"[HintSceneTransition] Cannot return to '{returnScene}', loading first scene in build settings.");
+                SceneManager.LoadScene(0);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[HintSceneTransition] Error returning to previous scene: {e.Message}");
+            SceneManager.LoadScene(0);
+        }
+    }
+    
+    /// <summary>
+    /// ヒントボタンを動的に作成（既存UIに追加する場合）
+    /// </summary>
+    /// <param name="parent">親オブジェクト</param>
+    /// <param name="buttonText">ボタンテキスト</param>
+    /// <param name="categoryIndex">カテゴリインデックス</param>
+    /// <returns>作成されたボタン</returns>
+    public GameObject CreateHintButton(Transform parent, string buttonText, int categoryIndex)
+    {
+        GameObject buttonObj = new GameObject($"HintButton_{buttonText}");
+        buttonObj.transform.SetParent(parent, false);
+        
+        // RectTransform設定
+        RectTransform rect = buttonObj.AddComponent<RectTransform>();
+        rect.sizeDelta = new Vector2(150, 40);
+        
+        // Image設定
+        Image image = buttonObj.AddComponent<Image>();
+        image.color = new Color(1f, 0.8f, 0.3f, 0.8f); // 黄色系
+        
+        // Button設定
+        Button button = buttonObj.AddComponent<Button>();
+        button.onClick.AddListener(() => GoToHintScene(categoryIndex));
+        
+        // テキスト作成
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(buttonObj.transform, false);
+        
+        Text text = textObj.AddComponent<Text>();
+        text.text = buttonText;
+        text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        text.fontSize = 14;
+        text.alignment = TextAnchor.MiddleCenter;
+        text.color = Color.black;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        return buttonObj;
+    }
+}

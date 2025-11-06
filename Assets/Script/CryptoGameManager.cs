@@ -30,6 +30,13 @@ public class CryptoGameManager : MonoBehaviour
     [Header("Progress UI")]
     public Slider[] progressSliders; // 3つの暗号方式用
     public Text[] progressLabels;
+    
+    [Header("Hint System")]
+    [Tooltip("ヒントボタン")]
+    public Button hintButton;
+    
+    [Tooltip("ヒントシーン遷移管理")]
+    public HintSceneTransition hintTransition;
 
     [Header("3D Animation System")]
     public CryptoAnimationManager animationManager;
@@ -68,13 +75,20 @@ public class CryptoGameManager : MonoBehaviour
         [Tooltip("復帰後のプレイヤーの向き（Reset Rotation が true の場合）")]
         public Vector3 resetRotationEuler = Vector3.zero;
         
-        [Tooltip("地面検出の最大距離")]
-        [Range(1f, 20f)]
-        public float groundDetectionDistance = 10f;
+        [Header("高さ調整設定")]
+        [Tooltip("地面検出を使用するか（無効にすると設定位置をそのまま使用）")]
+        public bool useGroundDetection = true;
         
-        [Tooltip("復帰位置の高さオフセット（地面検出時に追加される高さ）")]
-        [Range(0f, 5f)]
-        public float heightOffset = 0.5f;
+        [Tooltip("地面検出の最大距離")]
+        [Range(1f, 50f)]
+        public float groundDetectionDistance = 20f;
+        
+        [Tooltip("復帰位置の高さオフセット（地面からの高さ）")]
+        [Range(0f, 10f)]
+        public float heightOffset = 1.5f;
+        
+        [Tooltip("高さオフセットを強制適用（地面検出に関係なく常に適用）")]
+        public bool forceHeightOffset = false;
     }
     
     public enum ResetPositionType
@@ -167,7 +181,106 @@ public class CryptoGameManager : MonoBehaviour
             }
         }
         
+        // ヒント機能の初期化
+        InitializeHintSystem();
+        
         StartNewGameSet();
+    }
+    
+    /// <summary>
+    /// ヒント機能を初期化
+    /// </summary>
+    private void InitializeHintSystem()
+    {
+        // ヒント遷移管理が未設定の場合は自動検索
+        if (hintTransition == null)
+        {
+            hintTransition = GetComponent<HintSceneTransition>();
+            if (hintTransition == null)
+            {
+                hintTransition = FindObjectOfType<HintSceneTransition>();
+            }
+        }
+        
+        // ヒントボタンが未設定の場合は動的に作成
+        if (hintButton == null && hintTransition != null)
+        {
+            CreateHintButton();
+        }
+        
+        // ヒントボタンのイベント設定
+        if (hintButton != null && hintTransition != null)
+        {
+            hintButton.onClick.RemoveAllListeners();
+            hintButton.onClick.AddListener(() => {
+                // 現在の暗号方式に応じたヒントを表示
+                int categoryIndex = GetCurrentCategoryIndex();
+                hintTransition.GoToHintScene(categoryIndex);
+            });
+        }
+    }
+    
+    /// <summary>
+    /// 現在の暗号方式に対応するヒントカテゴリインデックスを取得
+    /// </summary>
+    private int GetCurrentCategoryIndex()
+    {
+        if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
+        {
+            CryptoType currentType = currentGameSet[currentQuestionIndex];
+            switch (currentType)
+            {
+                case CryptoType.SymmetricKey: return 0;
+                case CryptoType.PublicKey: return 1;
+                case CryptoType.Hybrid: return 2;
+                default: return -1; // 一般ヒント
+            }
+        }
+        return -1; // 一般ヒント
+    }
+    
+    /// <summary>
+    /// ヒントボタンを動的に作成
+    /// </summary>
+    private void CreateHintButton()
+    {
+        // UI Canvasを検索
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas == null) return;
+        
+        // ヒントボタンを作成
+        GameObject buttonObj = new GameObject("HintButton");
+        buttonObj.transform.SetParent(canvas.transform, false);
+        
+        RectTransform rect = buttonObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.85f, 0.85f);
+        rect.anchorMax = new Vector2(0.98f, 0.95f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        Image image = buttonObj.AddComponent<Image>();
+        image.color = new Color(1f, 0.8f, 0.2f, 0.9f); // 目立つ黄色
+        
+        hintButton = buttonObj.AddComponent<Button>();
+        
+        // ボタンテキスト
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(buttonObj.transform, false);
+        
+        Text buttonText = textObj.AddComponent<Text>();
+        buttonText.text = "💡 ヒント";
+        buttonText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+        buttonText.fontSize = 16;
+        buttonText.alignment = TextAnchor.MiddleCenter;
+        buttonText.color = Color.black;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        Debug.Log("ヒントボタンを動的に作成しました");
     }
     
     private void Update()
@@ -676,8 +789,10 @@ public class CryptoGameManager : MonoBehaviour
         Debug.Log($"プレイヤーを {targetPosition} にリセット中...");
 
         // 設定システムから詳細パラメータを取得
-        float groundDistance = resetSettings?.groundDetectionDistance ?? 10f;
-        float heightOffset = resetSettings?.heightOffset ?? 0.5f;
+        bool useGroundDetection = resetSettings?.useGroundDetection ?? true;
+        float groundDistance = resetSettings?.groundDetectionDistance ?? 20f;
+        float heightOffset = resetSettings?.heightOffset ?? 1.5f;
+        bool forceHeightOffset = resetSettings?.forceHeightOffset ?? false;
         bool shouldResetRotation = resetSettings?.resetRotation ?? false;
         Vector3 resetRotation = resetSettings?.resetRotationEuler ?? Vector3.zero;
 
@@ -710,12 +825,23 @@ public class CryptoGameManager : MonoBehaviour
             characterController.enabled = false;
             yield return new WaitForFixedUpdate(); // 物理更新を待つ
             
-            // 目標位置を設定の高さオフセット分高めに設定（床抜けを防ぐ）
-            Vector3 safeTargetPosition = targetPosition;
-            safeTargetPosition.y += heightOffset;
+            // 地面検出を使用するかどうかで処理を分岐
+            Vector3 finalPosition = targetPosition;
             
-            // 位置を設定
-            player.position = safeTargetPosition;
+            if (!useGroundDetection)
+            {
+                // 地面検出を使用しない場合：設定位置をそのまま使用
+                Debug.Log($"地面検出無効 - 設定位置をそのまま使用: {targetPosition}");
+                player.position = targetPosition;
+            }
+            else
+            {
+                // 地面検出を使用する場合：まず高めの位置に設定
+                Vector3 safeTargetPosition = targetPosition;
+                safeTargetPosition.y += heightOffset + 2f; // 安全マージンを追加
+                player.position = safeTargetPosition;
+                Debug.Log($"地面検出有効 - 一時的に高い位置に配置: {safeTargetPosition}");
+            }
             
             // 向きもリセットする場合
             if (shouldResetRotation)
@@ -730,28 +856,55 @@ public class CryptoGameManager : MonoBehaviour
             characterController.enabled = true;
             yield return new WaitForFixedUpdate(); // 物理更新を待つ
             
-            // 地面に向かってレイキャストして正確な地面位置を取得
-            RaycastHit hit;
-            Vector3 rayStart = safeTargetPosition + Vector3.up * 2f; // さらに高い位置から開始
-            
-            if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance))
+            // 地面検出処理
+            if (useGroundDetection)
             {
-                // 地面が見つかった場合、その位置に設定（CharacterControllerの高さを考慮）
-                Vector3 groundPosition = hit.point;
-                groundPosition.y += characterController.height * 0.5f + characterController.skinWidth + heightOffset;
+                // 地面に向かってレイキャストして正確な地面位置を取得
+                RaycastHit hit;
+                Vector3 rayStart = player.position + Vector3.up * 5f; // 十分に高い位置から開始
                 
-                // CharacterController.Moveを使用して安全に移動
-                Vector3 moveVector = groundPosition - player.position;
-                characterController.Move(moveVector);
+                Debug.Log($"地面検出開始 - レイキャスト開始位置: {rayStart}, 検出距離: {groundDistance}m");
                 
-                Debug.Log($"地面検出成功 - 正確な位置に配置: {groundPosition}");
-            }
-            else
-            {
-                // 地面が見つからない場合、元の目標位置を使用
-                Debug.LogWarning($"地面が検出されませんでした（検出距離: {groundDistance}m）。目標位置をそのまま使用します。");
-                Vector3 moveVector = targetPosition - player.position;
-                characterController.Move(moveVector);
+                if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance, ~0, QueryTriggerInteraction.Ignore))
+                {
+                    // 地面が見つかった場合、その位置に設定（CharacterControllerの高さを考慮）
+                    Vector3 groundPosition = hit.point;
+                    float controllerHeightOffset = characterController.height * 0.5f + characterController.skinWidth;
+                    groundPosition.y += controllerHeightOffset + heightOffset;
+                    
+                    // CharacterController.Moveを使用して安全に移動
+                    Vector3 moveVector = groundPosition - player.position;
+                    characterController.Move(moveVector);
+                    
+                    Debug.Log($"地面検出成功！");
+                    Debug.Log($"  - 地面の位置: {hit.point}");
+                    Debug.Log($"  - Controller高さオフセット: {controllerHeightOffset}");
+                    Debug.Log($"  - ユーザー設定オフセット: {heightOffset}");
+                    Debug.Log($"  - 最終配置位置: {groundPosition}");
+                    Debug.Log($"  - 実際のプレイヤー位置: {player.position}");
+                }
+                else
+                {
+                    // 地面が見つからない場合の処理
+                    Debug.LogWarning($"地面が検出されませんでした（検出距離: {groundDistance}m）");
+                    
+                    if (forceHeightOffset)
+                    {
+                        // 強制オフセットが有効な場合、目標位置にオフセットを適用
+                        Vector3 offsetPosition = targetPosition;
+                        offsetPosition.y += heightOffset;
+                        Vector3 moveVector = offsetPosition - player.position;
+                        characterController.Move(moveVector);
+                        Debug.Log($"強制オフセット適用 - 最終位置: {offsetPosition}");
+                    }
+                    else
+                    {
+                        // 元の目標位置を使用
+                        Vector3 moveVector = targetPosition - player.position;
+                        characterController.Move(moveVector);
+                        Debug.Log($"目標位置をそのまま使用: {targetPosition}");
+                    }
+                }
             }
             
             Debug.Log("CharacterController付きプレイヤーの位置リセット完了");
@@ -768,8 +921,34 @@ public class CryptoGameManager : MonoBehaviour
                 rb.linearVelocity = Vector3.zero;
                 rb.angularVelocity = Vector3.zero;
                 
+                Vector3 finalRigidbodyPosition = targetPosition;
+                
+                // 地面検出処理
+                if (useGroundDetection)
+                {
+                    RaycastHit hit;
+                    Vector3 rayStart = targetPosition + Vector3.up * 10f;
+                    
+                    if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance, ~0, QueryTriggerInteraction.Ignore))
+                    {
+                        finalRigidbodyPosition = hit.point;
+                        finalRigidbodyPosition.y += heightOffset;
+                        Debug.Log($"Rigidbody地面検出成功 - 配置位置: {finalRigidbodyPosition}");
+                    }
+                    else if (forceHeightOffset)
+                    {
+                        finalRigidbodyPosition.y += heightOffset;
+                        Debug.Log($"Rigidbody強制オフセット適用: +{heightOffset}m");
+                    }
+                }
+                else if (forceHeightOffset)
+                {
+                    finalRigidbodyPosition.y += heightOffset;
+                    Debug.Log($"Rigidbody地面検出無効・オフセット適用: +{heightOffset}m");
+                }
+                
                 // 位置を設定
-                rb.MovePosition(targetPosition);
+                rb.MovePosition(finalRigidbodyPosition);
                 
                 // 向きもリセットする場合
                 if (shouldResetRotation)
@@ -778,12 +957,38 @@ public class CryptoGameManager : MonoBehaviour
                     Debug.Log($"Rigidbodyプレイヤーの向きをリセット: {resetRotation}");
                 }
                 
-                Debug.Log("Rigidbody付きプレイヤーの位置リセット完了");
+                Debug.Log($"Rigidbody付きプレイヤーの位置リセット完了 - 最終位置: {finalRigidbodyPosition}");
             }
             else
             {
                 // 通常のTransformによる移動
-                player.position = targetPosition;
+                Vector3 finalTransformPosition = targetPosition;
+                
+                // 地面検出処理
+                if (useGroundDetection)
+                {
+                    RaycastHit hit;
+                    Vector3 rayStart = targetPosition + Vector3.up * 10f;
+                    
+                    if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance, ~0, QueryTriggerInteraction.Ignore))
+                    {
+                        finalTransformPosition = hit.point;
+                        finalTransformPosition.y += heightOffset;
+                        Debug.Log($"Transform地面検出成功 - 配置位置: {finalTransformPosition}");
+                    }
+                    else if (forceHeightOffset)
+                    {
+                        finalTransformPosition.y += heightOffset;
+                        Debug.Log($"Transform強制オフセット適用: +{heightOffset}m");
+                    }
+                }
+                else if (forceHeightOffset)
+                {
+                    finalTransformPosition.y += heightOffset;
+                    Debug.Log($"Transform地面検出無効・オフセット適用: +{heightOffset}m");
+                }
+                
+                player.position = finalTransformPosition;
                 
                 // 向きもリセットする場合
                 if (shouldResetRotation)
@@ -792,7 +997,7 @@ public class CryptoGameManager : MonoBehaviour
                     Debug.Log($"Transformプレイヤーの向きをリセット: {resetRotation}");
                 }
                 
-                Debug.Log("Transform直接操作でプレイヤーの位置リセット完了");
+                Debug.Log($"Transform直接操作でプレイヤーの位置リセット完了 - 最終位置: {finalTransformPosition}");
             }
         }
 
@@ -1057,28 +1262,43 @@ public class CryptoGameManager : MonoBehaviour
             return new Vector3(0, 3, 5);
         }
         
+        Vector3 basePosition;
+        
         switch (resetSettings.resetType)
         {
             case ResetPositionType.Custom:
-                return resetSettings.customPosition;
+                basePosition = resetSettings.customPosition;
+                break;
                 
             case ResetPositionType.Preset:
-                return GetPresetPosition(resetSettings.presetPosition);
+                basePosition = GetPresetPosition(resetSettings.presetPosition);
+                break;
                 
             case ResetPositionType.Transform:
                 if (resetSettings.referenceTransform != null)
                 {
-                    return resetSettings.referenceTransform.position;
+                    basePosition = resetSettings.referenceTransform.position;
                 }
                 else
                 {
                     Debug.LogWarning("Reference Transform が設定されていません。カスタム位置を使用します。");
-                    return resetSettings.customPosition;
+                    basePosition = resetSettings.customPosition;
                 }
+                break;
                 
             default:
-                return resetSettings.customPosition;
+                basePosition = resetSettings.customPosition;
+                break;
         }
+        
+        // 高さオフセットを強制適用する場合
+        if (resetSettings.forceHeightOffset)
+        {
+            basePosition.y += resetSettings.heightOffset;
+            Debug.Log($"高さオフセットを強制適用: +{resetSettings.heightOffset}m (最終Y座標: {basePosition.y})");
+        }
+        
+        return basePosition;
     }
     
     /// <summary>
