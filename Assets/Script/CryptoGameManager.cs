@@ -38,8 +38,61 @@ public class CryptoGameManager : MonoBehaviour
     [Tooltip("プレイヤーオブジェクト（正解時に位置をリセット）")]
     public Transform player;
     
-    [Tooltip("プレイヤーの復帰位置")]
-    public Vector3 playerResetPosition = new Vector3(0, 10, 5);
+    [Space(5)]
+    [Tooltip("プレイヤーの復帰位置設定")]
+    public PlayerResetSettings resetSettings;
+    
+    [System.Serializable]
+    public class PlayerResetSettings
+    {
+        [Header("復帰位置の種類")]
+        [Tooltip("復帰位置の設定方法を選択")]
+        public ResetPositionType resetType = ResetPositionType.Custom;
+        
+        [Header("カスタム位置設定")]
+        [Tooltip("カスタム復帰位置（Reset Type が Custom の場合に使用）")]
+        public Vector3 customPosition = new Vector3(0, 3, 5);
+        
+        [Header("プリセット位置")]
+        [Tooltip("プリセット復帰位置（Reset Type が Preset の場合に使用）")]
+        public PresetPosition presetPosition = PresetPosition.Center;
+        
+        [Header("Transform参照")]
+        [Tooltip("Transform参照復帰位置（Reset Type が Transform の場合に使用）")]
+        public Transform referenceTransform;
+        
+        [Header("詳細設定")]
+        [Tooltip("復帰時にプレイヤーの向きもリセットするか")]
+        public bool resetRotation = false;
+        
+        [Tooltip("復帰後のプレイヤーの向き（Reset Rotation が true の場合）")]
+        public Vector3 resetRotationEuler = Vector3.zero;
+        
+        [Tooltip("地面検出の最大距離")]
+        [Range(1f, 20f)]
+        public float groundDetectionDistance = 10f;
+        
+        [Tooltip("復帰位置の高さオフセット（地面検出時に追加される高さ）")]
+        [Range(0f, 5f)]
+        public float heightOffset = 0.5f;
+    }
+    
+    public enum ResetPositionType
+    {
+        Custom,     // カスタム位置
+        Preset,     // プリセット位置
+        Transform   // Transform参照
+    }
+    
+    public enum PresetPosition
+    {
+        Center,         // 中央 (0, 3, 5)
+        FarCenter,      // 遠い中央 (0, 3, 10)
+        LeftSide,       // 左側 (-5, 3, 5)
+        RightSide,      // 右側 (5, 3, 5)
+        HighCenter,     // 高い中央 (0, 8, 5)
+        StartPosition   // 開始位置 (0, 1, 0)
+    }
     
     // ゲーム状態
     private CryptoType[] currentGameSet;
@@ -609,7 +662,7 @@ public class CryptoGameManager : MonoBehaviour
     }
     
     /// <summary>
-    /// プレイヤーの位置をリセットする（CharacterController対応・床抜け防止・ThirdPersonController対応）
+    /// プレイヤーの位置をリセットする（設定システム対応・CharacterController対応・床抜け防止・ThirdPersonController対応）
     /// </summary>
     /// <param name="targetPosition">リセット先の位置</param>
     private IEnumerator ResetPlayerPosition(Vector3 targetPosition)
@@ -621,6 +674,12 @@ public class CryptoGameManager : MonoBehaviour
         }
 
         Debug.Log($"プレイヤーを {targetPosition} にリセット中...");
+
+        // 設定システムから詳細パラメータを取得
+        float groundDistance = resetSettings?.groundDetectionDistance ?? 10f;
+        float heightOffset = resetSettings?.heightOffset ?? 0.5f;
+        bool shouldResetRotation = resetSettings?.resetRotation ?? false;
+        Vector3 resetRotation = resetSettings?.resetRotationEuler ?? Vector3.zero;
 
         // ThirdPersonControllerを一時的に無効化（CharacterController.Moveエラーを防ぐ）
         MonoBehaviour targetController = null;
@@ -651,12 +710,20 @@ public class CryptoGameManager : MonoBehaviour
             characterController.enabled = false;
             yield return new WaitForFixedUpdate(); // 物理更新を待つ
             
-            // 目標位置を少し高めに設定（床抜けを防ぐ）
+            // 目標位置を設定の高さオフセット分高めに設定（床抜けを防ぐ）
             Vector3 safeTargetPosition = targetPosition;
-            safeTargetPosition.y += 0.5f; // 0.5m高く設定
+            safeTargetPosition.y += heightOffset;
             
             // 位置を設定
             player.position = safeTargetPosition;
+            
+            // 向きもリセットする場合
+            if (shouldResetRotation)
+            {
+                player.rotation = Quaternion.Euler(resetRotation);
+                Debug.Log($"プレイヤーの向きをリセット: {resetRotation}");
+            }
+            
             yield return new WaitForFixedUpdate(); // 物理更新を待つ
             
             // CharacterControllerを再有効化
@@ -667,11 +734,11 @@ public class CryptoGameManager : MonoBehaviour
             RaycastHit hit;
             Vector3 rayStart = safeTargetPosition + Vector3.up * 2f; // さらに高い位置から開始
             
-            if (Physics.Raycast(rayStart, Vector3.down, out hit, 10f))
+            if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance))
             {
                 // 地面が見つかった場合、その位置に設定（CharacterControllerの高さを考慮）
                 Vector3 groundPosition = hit.point;
-                groundPosition.y += characterController.height * 0.5f + characterController.skinWidth;
+                groundPosition.y += characterController.height * 0.5f + characterController.skinWidth + heightOffset;
                 
                 // CharacterController.Moveを使用して安全に移動
                 Vector3 moveVector = groundPosition - player.position;
@@ -682,7 +749,7 @@ public class CryptoGameManager : MonoBehaviour
             else
             {
                 // 地面が見つからない場合、元の目標位置を使用
-                Debug.LogWarning("地面が検出されませんでした。目標位置をそのまま使用します。");
+                Debug.LogWarning($"地面が検出されませんでした（検出距離: {groundDistance}m）。目標位置をそのまま使用します。");
                 Vector3 moveVector = targetPosition - player.position;
                 characterController.Move(moveVector);
             }
@@ -704,12 +771,27 @@ public class CryptoGameManager : MonoBehaviour
                 // 位置を設定
                 rb.MovePosition(targetPosition);
                 
+                // 向きもリセットする場合
+                if (shouldResetRotation)
+                {
+                    rb.MoveRotation(Quaternion.Euler(resetRotation));
+                    Debug.Log($"Rigidbodyプレイヤーの向きをリセット: {resetRotation}");
+                }
+                
                 Debug.Log("Rigidbody付きプレイヤーの位置リセット完了");
             }
             else
             {
                 // 通常のTransformによる移動
                 player.position = targetPosition;
+                
+                // 向きもリセットする場合
+                if (shouldResetRotation)
+                {
+                    player.rotation = Quaternion.Euler(resetRotation);
+                    Debug.Log($"Transformプレイヤーの向きをリセット: {resetRotation}");
+                }
+                
                 Debug.Log("Transform直接操作でプレイヤーの位置リセット完了");
             }
         }
@@ -734,8 +816,8 @@ public class CryptoGameManager : MonoBehaviour
         CryptoType currentType = currentGameSet[currentQuestionIndex];
         progressTracker.UpdateProgress(currentType, 20f); // 5問構成なので20%ずつ
         
-        // プレイヤーの位置をリセット（コルーチンで実行）
-        StartCoroutine(ResetPlayerPosition(playerResetPosition));
+        // プレイヤーの位置をリセット（設定システムを使用）
+        StartCoroutine(ResetPlayerPosition(GetPlayerResetPosition()));
         
         // 次のステップまたは次の問題へ
         currentStepIndex++;
@@ -962,5 +1044,64 @@ public class CryptoGameManager : MonoBehaviour
         resultPanel.SetActive(false);
         explanationPanel.SetActive(false);
         StartNewGameSet();
+    }
+
+    /// <summary>
+    /// 設定に基づいて実際の復帰位置を取得
+    /// </summary>
+    private Vector3 GetPlayerResetPosition()
+    {
+        if (resetSettings == null)
+        {
+            // デフォルト位置を返す
+            return new Vector3(0, 3, 5);
+        }
+        
+        switch (resetSettings.resetType)
+        {
+            case ResetPositionType.Custom:
+                return resetSettings.customPosition;
+                
+            case ResetPositionType.Preset:
+                return GetPresetPosition(resetSettings.presetPosition);
+                
+            case ResetPositionType.Transform:
+                if (resetSettings.referenceTransform != null)
+                {
+                    return resetSettings.referenceTransform.position;
+                }
+                else
+                {
+                    Debug.LogWarning("Reference Transform が設定されていません。カスタム位置を使用します。");
+                    return resetSettings.customPosition;
+                }
+                
+            default:
+                return resetSettings.customPosition;
+        }
+    }
+    
+    /// <summary>
+    /// プリセット位置を取得
+    /// </summary>
+    private Vector3 GetPresetPosition(PresetPosition preset)
+    {
+        switch (preset)
+        {
+            case PresetPosition.Center:
+                return new Vector3(0, 3, 5);
+            case PresetPosition.FarCenter:
+                return new Vector3(0, 3, 10);
+            case PresetPosition.LeftSide:
+                return new Vector3(-5, 3, 5);
+            case PresetPosition.RightSide:
+                return new Vector3(5, 3, 5);
+            case PresetPosition.HighCenter:
+                return new Vector3(0, 8, 5);
+            case PresetPosition.StartPosition:
+                return new Vector3(0, 1, 0);
+            default:
+                return new Vector3(0, 3, 5);
+        }
     }
 }
