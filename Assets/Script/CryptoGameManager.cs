@@ -4,6 +4,9 @@ using UnityEngine;
 using UnityEngine.UI;
 using System;
 
+/// <summary>
+/// 暗号学習ゲームの中核管理システム（ヒント機能なし・純粋ゲーム版）
+/// </summary>
 public class CryptoGameManager : MonoBehaviour
 {
     [Header("Game Settings")]
@@ -30,13 +33,6 @@ public class CryptoGameManager : MonoBehaviour
     [Header("Progress UI")]
     public Slider[] progressSliders; // 3つの暗号方式用
     public Text[] progressLabels;
-    
-    [Header("Hint System")]
-    [Tooltip("ヒントボタン")]
-    public Button hintButton;
-    
-    [Tooltip("ヒントシーン遷移管理")]
-    public HintSceneTransition hintTransition;
 
     [Header("3D Animation System")]
     public CryptoAnimationManager animationManager;
@@ -181,108 +177,30 @@ public class CryptoGameManager : MonoBehaviour
             }
         }
         
-        // ヒント機能の初期化
-        InitializeHintSystem();
+        // ゲーム用カーソル設定
+        SetGameCursor();
         
         StartNewGameSet();
     }
     
     /// <summary>
-    /// ヒント機能を初期化
+    /// ゲーム用カーソル設定
     /// </summary>
-    private void InitializeHintSystem()
+    private void SetGameCursor()
     {
-        // ヒント遷移管理が未設定の場合は自動検索
-        if (hintTransition == null)
+        // UIボタンがある場合はカーソルを表示、3Dのみの場合は非表示
+        if (answerButtons != null && answerButtons.Length > 0)
         {
-            hintTransition = GetComponent<HintSceneTransition>();
-            if (hintTransition == null)
-            {
-                hintTransition = FindObjectOfType<HintSceneTransition>();
-            }
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
         }
-        
-        // ヒントボタンが未設定の場合は動的に作成
-        if (hintButton == null && hintTransition != null)
+        else
         {
-            CreateHintButton();
-        }
-        
-        // ヒントボタンのイベント設定
-        if (hintButton != null && hintTransition != null)
-        {
-            hintButton.onClick.RemoveAllListeners();
-            hintButton.onClick.AddListener(() => {
-                // 現在の暗号方式に応じたヒントを表示
-                int categoryIndex = GetCurrentCategoryIndex();
-                hintTransition.GoToHintScene(categoryIndex);
-            });
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
         }
     }
-    
-    /// <summary>
-    /// 現在の暗号方式に対応するヒントカテゴリインデックスを取得
-    /// </summary>
-    private int GetCurrentCategoryIndex()
-    {
-        if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
-        {
-            CryptoType currentType = currentGameSet[currentQuestionIndex];
-            switch (currentType)
-            {
-                case CryptoType.SymmetricKey: return 0;
-                case CryptoType.PublicKey: return 1;
-                case CryptoType.Hybrid: return 2;
-                default: return -1; // 一般ヒント
-            }
-        }
-        return -1; // 一般ヒント
-    }
-    
-    /// <summary>
-    /// ヒントボタンを動的に作成
-    /// </summary>
-    private void CreateHintButton()
-    {
-        // UI Canvasを検索
-        Canvas canvas = FindObjectOfType<Canvas>();
-        if (canvas == null) return;
-        
-        // ヒントボタンを作成
-        GameObject buttonObj = new GameObject("HintButton");
-        buttonObj.transform.SetParent(canvas.transform, false);
-        
-        RectTransform rect = buttonObj.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.85f, 0.85f);
-        rect.anchorMax = new Vector2(0.98f, 0.95f);
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-        
-        Image image = buttonObj.AddComponent<Image>();
-        image.color = new Color(1f, 0.8f, 0.2f, 0.9f); // 目立つ黄色
-        
-        hintButton = buttonObj.AddComponent<Button>();
-        
-        // ボタンテキスト
-        GameObject textObj = new GameObject("Text");
-        textObj.transform.SetParent(buttonObj.transform, false);
-        
-        Text buttonText = textObj.AddComponent<Text>();
-        buttonText.text = "💡 ヒント";
-        buttonText.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        buttonText.fontSize = 16;
-        buttonText.alignment = TextAnchor.MiddleCenter;
-        buttonText.color = Color.black;
-        
-        RectTransform textRect = textObj.GetComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = Vector2.zero;
-        textRect.offsetMax = Vector2.zero;
-        
-        Debug.Log("ヒントボタンを動的に作成しました");
-    }
-    
+
     private void Update()
     {
         if (isGameActive)
@@ -522,26 +440,6 @@ public class CryptoGameManager : MonoBehaviour
         Debug.Log($"[判定詳細] 選択された回答: {(answerIndex < question.answers.Length ? question.answers[answerIndex] : "範囲外")}");
         Debug.Log($"[判定詳細] 正解の回答: {(question.correctAnswerIndex < question.answers.Length ? question.answers[question.correctAnswerIndex] : "範囲外")}");
         
-        // ハイブリッド暗号の5問目（stepIndex=4）の特別デバッグ
-        if (currentType == CryptoType.Hybrid && currentStepIndex == 4)
-        {
-            Debug.Log($"[ハイブリッド5問目デバッグ] 問題文: {question.questionText}");
-            Debug.Log($"[ハイブリッド5問目デバッグ] 選択肢数: {question.answers.Length}");
-            for (int i = 0; i < question.answers.Length; i++)
-            {
-                Debug.Log($"[ハイブリッド5問目デバッグ] 選択肢{i}: {question.answers[i]}");
-            }
-            Debug.Log($"[ハイブリッド5問目デバッグ] 正解インデックス: {question.correctAnswerIndex}");
-            Debug.Log($"[ハイブリッド5問目デバッグ] 選択されたインデックス: {answerIndex}");
-            Debug.Log($"[ハイブリッド5問目デバッグ] 判定結果: {(answerIndex == question.correctAnswerIndex ? "正解" : "不正解")}");
-            
-            // 問題データベースから直接データを取得して比較
-            var hybridQuestions = CryptoQuestionDatabase.GetQuestion(CryptoType.Hybrid, 4);
-            Debug.Log($"[直接取得テスト] 問題文: {hybridQuestions.questionText}");
-            Debug.Log($"[直接取得テスト] 正解インデックス: {hybridQuestions.correctAnswerIndex}");
-            Debug.Log($"[直接取得テスト] 選択肢配列: [{string.Join(", ", hybridQuestions.answers)}]");
-        }
-        
         // 配列範囲チェックを追加
         if (answerIndex < 0 || answerIndex >= question.answers.Length)
         {
@@ -560,20 +458,6 @@ public class CryptoGameManager : MonoBehaviour
         // 判定処理を明確に分離
         bool isCorrect = (answerIndex == question.correctAnswerIndex);
         Debug.Log($"[最終判定] 結果: {(isCorrect ? "正解" : "不正解")}");
-        
-        // ハイブリッド5問目の特別処理を追加
-        if (currentType == CryptoType.Hybrid && currentStepIndex == 4)
-        {
-            Debug.Log($"[ハイブリッド5問目 特別処理] 選択: {answerIndex}, 正解: {question.correctAnswerIndex}");
-            Debug.Log($"[ハイブリッド5問目 特別処理] 比較結果: {answerIndex} == {question.correctAnswerIndex} = {answerIndex == question.correctAnswerIndex}");
-            
-            // 強制的に正解として扱う（テスト用）
-            if (answerIndex == 2 && question.correctAnswerIndex == 2)
-            {
-                Debug.Log("[ハイブリッド5問目 強制修正] インデックス2を正解として処理");
-                isCorrect = true;
-            }
-        }
         
         // 即座にフィードバックを表示
         if (questionText != null)
@@ -761,19 +645,6 @@ public class CryptoGameManager : MonoBehaviour
         OnCorrectAnswer();
     }
     
-    private IEnumerator DelayedIncorrectAnswer(string explanation)
-    {
-        yield return new WaitForSeconds(1f); // フィードバック表示時間
-        
-        // UI色をリセット
-        if (questionText != null)
-        {
-            questionText.color = Color.white;
-        }
-        
-        OnIncorrectAnswer(explanation);
-    }
-    
     /// <summary>
     /// プレイヤーの位置をリセットする（設定システム対応・CharacterController対応・床抜け防止・ThirdPersonController対応）
     /// </summary>
@@ -876,12 +747,7 @@ public class CryptoGameManager : MonoBehaviour
                     Vector3 moveVector = groundPosition - player.position;
                     characterController.Move(moveVector);
                     
-                    Debug.Log($"地面検出成功！");
-                    Debug.Log($"  - 地面の位置: {hit.point}");
-                    Debug.Log($"  - Controller高さオフセット: {controllerHeightOffset}");
-                    Debug.Log($"  - ユーザー設定オフセット: {heightOffset}");
-                    Debug.Log($"  - 最終配置位置: {groundPosition}");
-                    Debug.Log($"  - 実際のプレイヤー位置: {player.position}");
+                    Debug.Log($"地面検出成功！最終配置位置: {groundPosition}");
                 }
                 else
                 {
@@ -1047,24 +913,6 @@ public class CryptoGameManager : MonoBehaviour
             // 同じ暗号方式の次のステップへ
             StartCoroutine(TransitionToNextQuestion());
         }
-    }
-    
-    private void OnIncorrectAnswer(string explanation)
-    {
-        StartCoroutine(ShowExplanation(explanation));
-    }
-    
-    private IEnumerator ShowExplanation(string explanation)
-    {
-        explanationPanel.SetActive(true);
-        explanationText.text = explanation;
-        
-        yield return new WaitForSeconds(3f);
-        
-        explanationPanel.SetActive(false);
-        
-        // 正解として次に進む（学習重視）
-        OnCorrectAnswer();
     }
     
     private IEnumerator TransitionToNextQuestion()

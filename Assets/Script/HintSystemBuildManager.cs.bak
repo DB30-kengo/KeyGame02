@@ -1,0 +1,312 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+#if UNITY_EDITOR
+using UnityEditor;
+using UnityEditor.SceneManagement;
+#endif
+
+/// <summary>
+/// ヒントシステムのビルド設定とシーン管理
+/// </summary>
+public class HintSystemBuildManager : MonoBehaviour
+{
+    [Header("Scene Settings")]
+    [Tooltip("メインゲームシーンのパス")]
+    public string mainGameScenePath = "Assets/Scenes/Chapter_game.unity";
+    
+    [Tooltip("ヒントシーンのパス")]
+    public string hintScenePath = "Assets/Scenes/HintScene.unity";
+    
+    [Header("Build Settings")]
+    [Tooltip("自動的にBuild Settingsを更新するか")]
+    public bool autoUpdateBuildSettings = true;
+    
+    void Start()
+    {
+        if (autoUpdateBuildSettings)
+        {
+            ValidateBuildSettings();
+        }
+        
+        LogCurrentBuildSettings();
+    }
+    
+    /// <summary>
+    /// Build Settingsを検証
+    /// </summary>
+    [ContextMenu("Validate Build Settings")]
+    public void ValidateBuildSettings()
+    {
+        Debug.Log("[HintSystemBuildManager] Build Settings検証を開始");
+        
+        #if UNITY_EDITOR
+        CheckAndAddScenesToBuildSettings();
+        #else
+        Debug.Log("Build Settings の更新はエディターでのみ利用可能です");
+        #endif
+    }
+    
+    /// <summary>
+    /// 現在のBuild Settingsを表示
+    /// </summary>
+    [ContextMenu("Log Build Settings")]
+    public void LogCurrentBuildSettings()
+    {
+        Debug.Log("=== Current Build Settings ===");
+        
+        int sceneCount = SceneManager.sceneCountInBuildSettings;
+        Debug.Log($"Total scenes in build: {sceneCount}");
+        
+        for (int i = 0; i < sceneCount; i++)
+        {
+            string scenePath = SceneUtility.GetScenePathByBuildIndex(i);
+            Debug.Log($"Scene {i}: {scenePath}");
+        }
+    }
+    
+    /// <summary>
+    /// シーンがBuild Settingsに存在するかチェック
+    /// </summary>
+    public bool IsSceneInBuildSettings(string scenePath)
+    {
+        int sceneCount = SceneManager.sceneCountInBuildSettings;
+        
+        for (int i = 0; i < sceneCount; i++)
+        {
+            string buildScenePath = SceneUtility.GetScenePathByBuildIndex(i);
+            if (buildScenePath == scenePath)
+            {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// シーンのBuild Indexを取得
+    /// </summary>
+    public int GetSceneBuildIndex(string scenePath)
+    {
+        return SceneUtility.GetBuildIndexByScenePath(scenePath);
+    }
+    
+    #if UNITY_EDITOR
+    /// <summary>
+    /// 必要なシーンをBuild Settingsに追加
+    /// </summary>
+    private void CheckAndAddScenesToBuildSettings()
+    {
+        EditorBuildSettingsScene[] originalScenes = EditorBuildSettings.scenes;
+        System.Collections.Generic.List<EditorBuildSettingsScene> newScenes = new System.Collections.Generic.List<EditorBuildSettingsScene>(originalScenes);
+        
+        bool needsUpdate = false;
+        
+        // メインゲームシーンをチェック
+        if (!IsSceneInBuildSettings(mainGameScenePath))
+        {
+            if (System.IO.File.Exists(mainGameScenePath))
+            {
+                newScenes.Add(new EditorBuildSettingsScene(mainGameScenePath, true));
+                needsUpdate = true;
+                Debug.Log($"[HintSystemBuildManager] メインゲームシーンを追加: {mainGameScenePath}");
+            }
+            else
+            {
+                Debug.LogWarning($"[HintSystemBuildManager] メインゲームシーンが見つかりません: {mainGameScenePath}");
+            }
+        }
+        
+        // ヒントシーンをチェック
+        if (!IsSceneInBuildSettings(hintScenePath))
+        {
+            if (System.IO.File.Exists(hintScenePath))
+            {
+                newScenes.Add(new EditorBuildSettingsScene(hintScenePath, true));
+                needsUpdate = true;
+                Debug.Log($"[HintSystemBuildManager] ヒントシーンを追加: {hintScenePath}");
+            }
+            else
+            {
+                Debug.LogWarning($"[HintSystemBuildManager] ヒントシーンが見つかりません: {hintScenePath}");
+                CreateHintScene();
+            }
+        }
+        
+        // Build Settingsを更新
+        if (needsUpdate)
+        {
+            EditorBuildSettings.scenes = newScenes.ToArray();
+            Debug.Log("[HintSystemBuildManager] Build Settingsを更新しました");
+        }
+        else
+        {
+            Debug.Log("[HintSystemBuildManager] Build Settingsは既に正しく設定されています");
+        }
+    }
+    
+    /// <summary>
+    /// ヒントシーンを作成
+    /// </summary>
+    [ContextMenu("Create Hint Scene")]
+    public void CreateHintScene()
+    {
+        Debug.Log("[HintSystemBuildManager] ヒントシーンを作成中...");
+        
+        // 新しいシーンを作成
+        Scene newScene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+        
+        // 基本的なコンポーネントを追加
+        SetupHintSceneBasics();
+        
+        // シーンを保存
+        EditorSceneManager.SaveScene(newScene, hintScenePath);
+        
+        Debug.Log($"[HintSystemBuildManager] ヒントシーンを作成: {hintScenePath}");
+    }
+    
+    /// <summary>
+    /// ヒントシーンの基本設定
+    /// </summary>
+    private void SetupHintSceneBasics()
+    {
+        // Main Camera
+        GameObject camera = new GameObject("Main Camera");
+        Camera cam = camera.AddComponent<Camera>();
+        camera.tag = "MainCamera";
+        cam.clearFlags = CameraClearFlags.SolidColor;
+        cam.backgroundColor = new Color(0.05f, 0.1f, 0.2f, 1f);
+        
+        // Canvas
+        GameObject canvasObj = new GameObject("Canvas");
+        Canvas canvas = canvasObj.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvasObj.AddComponent<CanvasScaler>();
+        canvasObj.AddComponent<GraphicRaycaster>();
+        
+        // EventSystem
+        GameObject eventObj = new GameObject("EventSystem");
+        eventObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
+        eventObj.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        
+        // HintSceneAutoSetup
+        GameObject setupObj = new GameObject("HintSceneAutoSetup");
+        HintSceneAutoSetup setup = setupObj.AddComponent<HintSceneAutoSetup>();
+        setup.mainGameSceneName = "Chapter_game";
+        
+        // HintSystemValidator (optional)
+        GameObject validatorObj = new GameObject("HintSystemValidator");
+        validatorObj.AddComponent<HintSystemValidator>();
+        
+        // HintSystemDemo (optional)
+        GameObject demoObj = new GameObject("HintSystemDemo");
+        demoObj.AddComponent<HintSystemDemo>();
+        
+        Debug.Log("[HintSystemBuildManager] ヒントシーンの基本コンポーネントを設定しました");
+    }
+    
+    /// <summary>
+    /// 現在のシーンをヒントシーンとして保存
+    /// </summary>
+    [ContextMenu("Save Current Scene as Hint Scene")]
+    public void SaveCurrentSceneAsHintScene()
+    {
+        Scene currentScene = SceneManager.GetActiveScene();
+        EditorSceneManager.SaveScene(currentScene, hintScenePath);
+        Debug.Log($"[HintSystemBuildManager] 現在のシーンをヒントシーンとして保存: {hintScenePath}");
+    }
+    #endif
+    
+    /// <summary>
+    /// ヒントシステムの完全性をチェック
+    /// </summary>
+    [ContextMenu("Check Hint System Integrity")]
+    public void CheckHintSystemIntegrity()
+    {
+        Debug.Log("=== Hint System Integrity Check ===");
+        
+        // シーンファイルの存在確認
+        bool mainGameExists = System.IO.File.Exists(mainGameScenePath);
+        bool hintSceneExists = System.IO.File.Exists(hintScenePath);
+        
+        Debug.Log($"Main Game Scene exists: {mainGameExists} ({mainGameScenePath})");
+        Debug.Log($"Hint Scene exists: {hintSceneExists} ({hintScenePath})");
+        
+        // Build Settingsの確認
+        bool mainGameInBuild = IsSceneInBuildSettings(mainGameScenePath);
+        bool hintSceneInBuild = IsSceneInBuildSettings(hintScenePath);
+        
+        Debug.Log($"Main Game Scene in build: {mainGameInBuild}");
+        Debug.Log($"Hint Scene in build: {hintSceneInBuild}");
+        
+        if (mainGameInBuild)
+        {
+            Debug.Log($"Main Game Scene build index: {GetSceneBuildIndex(mainGameScenePath)}");
+        }
+        
+        if (hintSceneInBuild)
+        {
+            Debug.Log($"Hint Scene build index: {GetSceneBuildIndex(hintScenePath)}");
+        }
+        
+        // スクリプトの存在確認
+        CheckRequiredScripts();
+        
+        // 総合評価
+        bool isComplete = mainGameExists && hintSceneExists && mainGameInBuild && hintSceneInBuild;
+        
+        if (isComplete)
+        {
+            Debug.Log("🎉 ヒントシステムは完全に設定されています！");
+        }
+        else
+        {
+            Debug.LogWarning("⚠️ ヒントシステムの設定が不完全です。上記の項目を確認してください。");
+        }
+    }
+    
+    private void CheckRequiredScripts()
+    {
+        Debug.Log("--- Required Scripts Check ---");
+        
+        string[] requiredScripts = {
+            "RealHintSystem",
+            "HintSystemLauncher", 
+            "HintSceneAutoSetup",
+            "UIUtility"
+        };
+        
+        foreach (string scriptName in requiredScripts)
+        {
+            System.Type scriptType = System.Type.GetType(scriptName);
+            bool exists = scriptType != null;
+            Debug.Log($"{scriptName}: {(exists ? "✅" : "❌")}");
+        }
+    }
+    
+    /// <summary>
+    /// クイックセットアップ - 全体的な設定を自動実行
+    /// </summary>
+    [ContextMenu("Quick Setup All")]
+    public void QuickSetupAll()
+    {
+        Debug.Log("[HintSystemBuildManager] クイックセットアップを実行中...");
+        
+        #if UNITY_EDITOR
+        // ヒントシーンが存在しない場合は作成
+        if (!System.IO.File.Exists(hintScenePath))
+        {
+            CreateHintScene();
+        }
+        
+        // Build Settingsを更新
+        ValidateBuildSettings();
+        #endif
+        
+        // 整合性チェック
+        CheckHintSystemIntegrity();
+        
+        Debug.Log("[HintSystemBuildManager] クイックセットアップ完了");
+    }
+}

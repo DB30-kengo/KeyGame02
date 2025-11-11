@@ -1,0 +1,247 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// ヒントシステムの簡単なテストランナー
+/// シーンに配置して、ワンクリックでヒント詳細表示をテスト
+/// </summary>
+public class SimpleHintTester : MonoBehaviour
+{
+    [Header("テスト設定")]
+    public bool createTestObjectsOnStart = true;
+    public KeyCode testKey = KeyCode.H;
+    
+    private GameObject testUI;
+    
+    void Start()
+    {
+        if (createTestObjectsOnStart)
+        {
+            SetupTestEnvironment();
+        }
+        
+        Debug.Log($"[SimpleHintTester] Ready! Press {testKey} to test hint detail display.");
+        Debug.Log("[SimpleHintTester] Available tests:");
+        Debug.Log("  F2: Quick Hint Detail Test (QuickHintDetailFix)");
+        Debug.Log("  F5: Auto Fix Hint System (HintDetailDisplayFixer)"); 
+        Debug.Log("  F6: Test Hint Display (HintDetailDisplayFixer)");
+        Debug.Log($"  {testKey}: Simple integrated test");
+    }
+    
+    void Update()
+    {
+        if (Input.GetKeyDown(testKey))
+        {
+            RunSimpleTest();
+        }
+        
+        // 緊急リセット
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            ResetAllTestUI();
+        }
+    }
+    
+    void SetupTestEnvironment()
+    {
+        Debug.Log("[SimpleHintTester] Setting up test environment...");
+        
+        // 必要なコンポーネントを全て追加
+        
+        // 1. RealHintSystem
+        if (FindObjectOfType<RealHintSystem>() == null)
+        {
+            GameObject hintSystemObj = new GameObject("TestRealHintSystem");
+            hintSystemObj.AddComponent<RealHintSystem>();
+            Debug.Log("[SimpleHintTester] RealHintSystem created");
+        }
+        
+        // 2. HintDetailDisplayFixer
+        if (FindObjectOfType<HintDetailDisplayFixer>() == null)
+        {
+            GameObject fixerObj = new GameObject("HintDetailDisplayFixer");
+            HintDetailDisplayFixer fixer = fixerObj.AddComponent<HintDetailDisplayFixer>();
+            fixer.autoFixOnStart = true;
+            fixer.debugMode = true;
+            Debug.Log("[SimpleHintTester] HintDetailDisplayFixer created");
+        }
+        
+        // 3. QuickHintDetailFix
+        if (FindObjectOfType<QuickHintDetailFix>() == null)
+        {
+            GameObject quickFixObj = new GameObject("QuickHintDetailFix");
+            quickFixObj.AddComponent<QuickHintDetailFix>();
+            Debug.Log("[SimpleHintTester] QuickHintDetailFix created");
+        }
+        
+        Debug.Log("[SimpleHintTester] Test environment setup complete!");
+    }
+    
+    void RunSimpleTest()
+    {
+        Debug.Log("[SimpleHintTester] Running simple integrated test...");
+        
+        // カーソル設定
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        
+        // RealHintSystemを取得
+        RealHintSystem hintSystem = FindObjectOfType<RealHintSystem>();
+        if (hintSystem == null)
+        {
+            Debug.LogError("[SimpleHintTester] No RealHintSystem found!");
+            return;
+        }
+        
+        // HintDetailPatchを使用した表示テスト
+        HintDetailPatch patch = hintSystem.GetComponent<HintDetailPatch>();
+        if (patch == null)
+        {
+            patch = hintSystem.gameObject.AddComponent<HintDetailPatch>();
+            patch.Initialize(hintSystem);
+        }
+        
+        // 修正されたヒント詳細表示を実行
+        patch.ShowHintDetailFixed(0, "symmetric");
+        
+        Debug.Log("[SimpleHintTester] Simple test completed!");
+    }
+    
+    void ResetAllTestUI()
+    {
+        Debug.Log("[SimpleHintTester] Resetting all test UI...");
+        
+        // 全てのテスト用UIを削除
+        GameObject[] testObjects = {
+            GameObject.Find("PatchedHintDetail"),
+            GameObject.Find("EmergencyHintDisplay"),
+            GameObject.Find("HintSystemCanvas"),
+            GameObject.Find("RealHintSystemContainer")
+        };
+        
+        foreach (GameObject obj in testObjects)
+        {
+            if (obj != null)
+            {
+                Debug.Log($"[SimpleHintTester] Destroying {obj.name}");
+                DestroyImmediate(obj);
+            }
+        }
+        
+        // カーソルをリセット
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        
+        Debug.Log("[SimpleHintTester] Reset complete!");
+    }
+    
+    void OnGUI()
+    {
+        // 左上に簡単な操作ガイドを表示
+        GUILayout.BeginArea(new Rect(10, 10, 400, 120));
+        
+        GUIStyle style = new GUIStyle(GUI.skin.label);
+        style.fontSize = 14;
+        style.normal.textColor = Color.white;
+        
+        GUILayout.Label("=== Hint System Tester ===", style);
+        GUILayout.Label($"Press {testKey}: Simple Test", style);
+        GUILayout.Label("Press F5: Auto Fix System", style);
+        GUILayout.Label("Press F6: Test Display", style);
+        GUILayout.Label("Press ESC: Reset All UI", style);
+        
+        GUILayout.EndArea();
+        
+        // 右上にテストボタン
+        GUILayout.BeginArea(new Rect(Screen.width - 250, 10, 240, 180));
+        
+        if (GUILayout.Button("Run Simple Test", GUILayout.Height(30)))
+        {
+            RunSimpleTest();
+        }
+        
+        if (GUILayout.Button("Setup Test Environment", GUILayout.Height(30)))
+        {
+            SetupTestEnvironment();
+        }
+        
+        if (GUILayout.Button("Reset All UI", GUILayout.Height(30)))
+        {
+            ResetAllTestUI();
+        }
+        
+        if (GUILayout.Button("Test Font System", GUILayout.Height(30)))
+        {
+            TestFontSystem();
+        }
+        
+        if (GUILayout.Button("Show Emergency Hint", GUILayout.Height(30)))
+        {
+            ShowEmergencyHint();
+        }
+        
+        GUILayout.EndArea();
+    }
+    
+    void TestFontSystem()
+    {
+        Debug.Log("[SimpleHintTester] Testing font system...");
+        
+        Font font = UIUtility.GetDefaultFont();
+        if (font != null)
+        {
+            Debug.Log($"[SimpleHintTester] Font OK: {font.name}");
+            
+            // 画面に確認メッセージを表示
+            if (testUI != null)
+            {
+                DestroyImmediate(testUI);
+            }
+            
+            testUI = new GameObject("FontTestUI");
+            Canvas canvas = FindObjectOfType<Canvas>();
+            if (canvas == null)
+            {
+                GameObject canvasObj = new GameObject("TestCanvas");
+                canvas = canvasObj.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            }
+            
+            testUI.transform.SetParent(canvas.transform, false);
+            
+            Text text = testUI.AddComponent<Text>();
+            text.text = $"Font Test OK: {font.name}";
+            text.font = font;
+            text.fontSize = 20;
+            text.color = Color.green;
+            text.alignment = TextAnchor.MiddleCenter;
+            
+            RectTransform rect = testUI.GetComponent<RectTransform>();
+            rect.anchoredPosition = Vector2.zero;
+            rect.sizeDelta = new Vector2(300, 50);
+            
+            // 3秒後に削除
+            Destroy(testUI, 3f);
+        }
+        else
+        {
+            Debug.LogError("[SimpleHintTester] Font test failed!");
+        }
+    }
+    
+    void ShowEmergencyHint()
+    {
+        Debug.Log("[SimpleHintTester] Showing emergency hint...");
+        
+        HintDetailDisplayFixer fixer = FindObjectOfType<HintDetailDisplayFixer>();
+        if (fixer != null)
+        {
+            fixer.GetComponent<HintDetailDisplayFixer>().SendMessage("CreateEmergencyHintDisplay");
+        }
+        else
+        {
+            Debug.LogWarning("[SimpleHintTester] No HintDetailDisplayFixer found!");
+        }
+    }
+}

@@ -1,0 +1,170 @@
+using UnityEngine;
+
+/// <summary>
+/// 新しいシンプルヒントシステムのテスト用スクリプト
+/// Unity エディタでシステムが正常に動作することを確認します
+/// </summary>
+public class SimpleHintSystemTester : MonoBehaviour
+{
+    [Header("テスト設定")]
+    [Tooltip("テストを自動実行するかどうか")]
+    public bool autoTest = false;
+    
+    [Tooltip("テスト間隔（秒）")]
+    public float testInterval = 5f;
+    
+    private NewHintManager hintManager;
+    private float nextTestTime = 0f;
+    private int testPhase = 0;
+    
+    void Start()
+    {
+        // NewHintManagerを検索
+        hintManager = FindObjectOfType<NewHintManager>();
+        if (hintManager == null)
+        {
+            Debug.LogError("[SimpleHintSystemTester] NewHintManagerが見つかりません！");
+            return;
+        }
+        
+        Debug.Log("[SimpleHintSystemTester] シンプルヒントシステムテスター準備完了");
+        Debug.Log("操作方法:");
+        Debug.Log("1キー: SimpleHintDisplayテスト");
+        Debug.Log("2キー: MinimalHintDisplayテスト");
+        Debug.Log("3キー: NotificationHintSystemテスト");
+        Debug.Log("4キー: ヒント表示タイプ切り替え");
+        Debug.Log("5キー: 総合テスト開始");
+    }
+    
+    void Update()
+    {
+        if (hintManager == null) return;
+        
+        // 手動テスト
+        if (Input.GetKeyDown(KeyCode.Alpha1))
+        {
+            TestSimpleHintDisplay();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha2))
+        {
+            TestMinimalHintDisplay();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha3))
+        {
+            TestNotificationHintSystem();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha4))
+        {
+            TestHintTypeSwitching();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha5))
+        {
+            StartAutoTest();
+        }
+        
+        // 自動テスト
+        if (autoTest && Time.time >= nextTestTime)
+        {
+            RunAutoTest();
+            nextTestTime = Time.time + testInterval;
+        }
+    }
+    
+    void TestSimpleHintDisplay()
+    {
+        Debug.Log("[Test] SimpleHintDisplayテスト開始");
+        hintManager.SetDisplayType(NewHintManager.HintDisplayType.Simple);
+        hintManager.ShowHint();
+    }
+    
+    void TestMinimalHintDisplay()
+    {
+        Debug.Log("[Test] MinimalHintDisplayテスト開始");
+        hintManager.SetDisplayType(NewHintManager.HintDisplayType.Minimal);
+        hintManager.ShowHint();
+    }
+    
+    void TestNotificationHintSystem()
+    {
+        Debug.Log("[Test] NotificationHintSystemテスト開始");
+        hintManager.SetDisplayType(NewHintManager.HintDisplayType.Notification);
+        hintManager.ShowHint();
+    }
+    
+    void TestHintTypeSwitching()
+    {
+        Debug.Log("[Test] ヒント表示タイプ切り替えテスト");
+        hintManager.CycleDisplayType();
+        hintManager.ShowHint();
+    }
+    
+    void StartAutoTest()
+    {
+        Debug.Log("[Test] 自動テスト開始");
+        autoTest = true;
+        testPhase = 0;
+        nextTestTime = Time.time + 1f;
+    }
+    
+    void RunAutoTest()
+    {
+        switch (testPhase)
+        {
+            case 0:
+                Debug.Log("[AutoTest] フェーズ1: SimpleHintDisplay");
+                TestSimpleHintDisplay();
+                break;
+            case 1:
+                Debug.Log("[AutoTest] フェーズ2: MinimalHintDisplay");
+                TestMinimalHintDisplay();
+                break;
+            case 2:
+                Debug.Log("[AutoTest] フェーズ3: NotificationHintSystem");
+                TestNotificationHintSystem();
+                break;
+            case 3:
+                Debug.Log("[AutoTest] フェーズ4: タイプ切り替え");
+                TestHintTypeSwitching();
+                break;
+            default:
+                Debug.Log("[AutoTest] 自動テスト完了");
+                autoTest = false;
+                testPhase = 0;
+                return;
+        }
+        
+        testPhase++;
+    }
+    
+    void OnGUI()
+    {
+        if (hintManager == null) return;
+        
+        // テスト情報を画面左下に表示
+        GUIStyle style = new GUIStyle(GUI.skin.box);
+        style.fontSize = 12;
+        style.normal.textColor = Color.white;
+        style.normal.background = MakeTexture(1, 1, new Color(0, 0, 0, 0.8f));
+        
+        string info = $"シンプルヒントシステムテスター\n" +
+                     $"現在の表示タイプ: {hintManager.GetCurrentDisplayType()}\n" +
+                     $"1-3: 個別テスト | 4: 切り替え | 5: 自動テスト\n" +
+                     $"自動テスト: {(autoTest ? "実行中" : "停止")}";
+        
+        Vector2 size = style.CalcSize(new GUIContent(info));
+        Rect rect = new Rect(10, Screen.height - size.y - 10, size.x + 20, size.y);
+        GUI.Box(rect, info, style);
+    }
+    
+    private Texture2D MakeTexture(int width, int height, Color color)
+    {
+        Color[] pix = new Color[width * height];
+        for (int i = 0; i < pix.Length; i++)
+            pix[i] = color;
+        
+        Texture2D result = new Texture2D(width, height);
+        result.SetPixels(pix);
+        result.Apply();
+        return result;
+    }
+}

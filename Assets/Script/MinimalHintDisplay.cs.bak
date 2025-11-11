@@ -1,0 +1,89 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+/// <summary>
+/// 極限までシンプルなヒント表示システム
+/// ゲーム画面の邪魔にならない最小限のヒント表示
+/// </summary>
+public class MinimalHintDisplay : MonoBehaviour
+{
+    [Header("基本設定")]
+    public KeyCode hintKey = KeyCode.H;
+    public float showDuration = 3f;
+    
+    private string[] hints = {
+        "💡 WASD: 移動",
+        "💡 マウス: 視点変更", 
+        "💡 クリック: 選択",
+        "🔐 共通鍵: 同じ鍵で暗号化・復号化",
+        "🗝️ 公開鍵: 公開鍵と秘密鍵のペア",
+        "🔗 ハイブリッド: 両方式の組み合わせ",
+        "⚡ AES: 広く使われる共通鍵暗号",
+        "🛡️ RSA: 代表的な公開鍵暗号"
+    };
+    
+    private int currentIndex = 0;
+    private bool isShowing = false;
+    private float showTimer = 0f;
+    
+    void Update()
+    {
+        // ヒント表示/次のヒント
+        if (Input.GetKeyDown(hintKey))
+        {
+            ShowNextHint();
+        }
+        
+        // タイマー管理
+        if (isShowing)
+        {
+            showTimer -= Time.deltaTime;
+            if (showTimer <= 0f)
+            {
+                isShowing = false;
+            }
+        }
+    }
+    
+    public void ShowNextHint()
+    {
+        currentIndex = (currentIndex + 1) % hints.Length;
+        isShowing = true;
+        showTimer = showDuration;
+    }
+    
+    void OnGUI()
+    {
+        if (!isShowing) return;
+        
+        // 画面右上に小さくヒント表示
+        GUIStyle style = new GUIStyle(GUI.skin.box);
+        style.fontSize = 16;
+        style.normal.textColor = Color.white;
+        style.normal.background = MakeTexture(1, 1, new Color(0, 0, 0, 0.7f));
+        style.padding = new RectOffset(10, 10, 10, 10);
+        
+        string displayText = hints[currentIndex];
+        Vector2 size = style.CalcSize(new GUIContent(displayText));
+        
+        Rect rect = new Rect(Screen.width - size.x - 20, 20, size.x, size.y);
+        GUI.Box(rect, displayText, style);
+        
+        // プログレスバー
+        float progress = (showDuration - showTimer) / showDuration;
+        Rect progressRect = new Rect(rect.x, rect.y + rect.height + 2, rect.width * progress, 3);
+        GUI.DrawTexture(progressRect, MakeTexture(1, 1, Color.yellow));
+    }
+    
+    private Texture2D MakeTexture(int width, int height, Color color)
+    {
+        Color[] pix = new Color[width * height];
+        for (int i = 0; i < pix.Length; i++)
+            pix[i] = color;
+        
+        Texture2D result = new Texture2D(width, height);
+        result.SetPixels(pix);
+        result.Apply();
+        return result;
+    }
+}

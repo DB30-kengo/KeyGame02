@@ -1,0 +1,440 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// 実際のヒント機能の動作確認とデモンストレーション用スクリプト
+/// </summary>
+public class HintSystemDemo : MonoBehaviour
+{
+    [Header("Demo Settings")]
+    [Tooltip("デモを自動実行するか")]
+    public bool runAutomaticDemo = false;
+    
+    [Header("UI References")]
+    public Text statusText;
+    public Button testButton;
+    
+    private string currentStatus = "Ready";
+    
+    void Start()
+    {
+        CreateDemoUI();
+        
+        if (runAutomaticDemo)
+        {
+            StartDemo();
+        }
+        
+        Debug.Log("[HintSystemDemo] ヒントシステムデモを開始しました");
+    }
+    
+    void Update()
+    {
+        // デモ用ショートカットキー
+        if (Input.GetKeyDown(KeyCode.F1))
+        {
+            DemoHintSystemLaunch();
+        }
+        
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            DemoSceneTransition();
+        }
+        
+        if (Input.GetKeyDown(KeyCode.F3))
+        {
+            DemoCursorManagement();
+        }
+        
+        if (Input.GetKeyDown(KeyCode.F4))
+        {
+            RunCompleteDemo();
+        }
+    }
+    
+    /// <summary>
+    /// デモ用UIを作成
+    /// </summary>
+    private void CreateDemoUI()
+    {
+        // Canvas確保
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            GameObject canvasObj = new GameObject("DemoCanvas");
+            canvas = canvasObj.AddComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasObj.AddComponent<CanvasScaler>();
+            canvasObj.AddComponent<GraphicRaycaster>();
+        }
+        
+        // ステータステキスト作成
+        if (statusText == null)
+        {
+            GameObject statusObj = new GameObject("StatusText");
+            statusObj.transform.SetParent(canvas.transform, false);
+            
+            RectTransform statusRect = statusObj.AddComponent<RectTransform>();
+            statusRect.anchorMin = new Vector2(0.02f, 0.02f);
+            statusRect.anchorMax = new Vector2(0.5f, 0.15f);
+            statusRect.offsetMin = Vector2.zero;
+            statusRect.offsetMax = Vector2.zero;
+            
+            statusText = statusObj.AddComponent<Text>();
+            statusText.font = UIUtility.GetDefaultFont();
+            statusText.fontSize = 14;
+            statusText.color = Color.white;
+            statusText.text = "Hint System Demo Ready\nF1: Test Launch\nF2: Scene Transition\nF3: Cursor Demo\nF4: Complete Demo";
+        }
+        
+        // テストボタン作成
+        if (testButton == null)
+        {
+            GameObject buttonObj = new GameObject("DemoTestButton");
+            buttonObj.transform.SetParent(canvas.transform, false);
+            
+            RectTransform buttonRect = buttonObj.AddComponent<RectTransform>();
+            buttonRect.anchorMin = new Vector2(0.02f, 0.8f);
+            buttonRect.anchorMax = new Vector2(0.25f, 0.9f);
+            buttonRect.offsetMin = Vector2.zero;
+            buttonRect.offsetMax = Vector2.zero;
+            
+            testButton = buttonObj.AddComponent<Button>();
+            Image buttonImage = buttonObj.AddComponent<Image>();
+            buttonImage.color = new Color(0.2f, 0.7f, 0.2f, 0.8f);
+            
+            // ボタンテキスト
+            GameObject textObj = new GameObject("Text");
+            textObj.transform.SetParent(buttonObj.transform, false);
+            
+            Text buttonText = textObj.AddComponent<Text>();
+            buttonText.text = "🎮 Complete Demo";
+            buttonText.font = UIUtility.GetDefaultFont();
+            buttonText.fontSize = 16;
+            buttonText.color = Color.white;
+            buttonText.alignment = TextAnchor.MiddleCenter;
+            
+            RectTransform textRect = textObj.GetComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            
+            // ボタンイベント
+            testButton.onClick.AddListener(RunCompleteDemo);
+        }
+    }
+    
+    /// <summary>
+    /// デモを開始
+    /// </summary>
+    [ContextMenu("Start Demo")]
+    public void StartDemo()
+    {
+        UpdateStatus("Demo Started");
+        Debug.Log("[HintSystemDemo] デモンストレーションを開始します");
+        
+        // システム検証
+        VerifySystemComponents();
+    }
+    
+    /// <summary>
+    /// システムコンポーネントを検証
+    /// </summary>
+    private void VerifySystemComponents()
+    {
+        UpdateStatus("Verifying system components...");
+        
+        string currentScene = SceneManager.GetActiveScene().name;
+        Debug.Log($"[HintSystemDemo] Current scene: {currentScene}");
+        
+        // 現在のシーンに応じた検証
+        if (currentScene == "HintScene")
+        {
+            VerifyHintSceneComponents();
+        }
+        else
+        {
+            VerifyGameSceneComponents();
+        }
+    }
+    
+    private void VerifyHintSceneComponents()
+    {
+        Debug.Log("[HintSystemDemo] HintScene コンポーネント検証中...");
+        
+        RealHintSystem realHint = FindObjectOfType<RealHintSystem>();
+        if (realHint != null)
+        {
+            UpdateStatus("✅ RealHintSystem found and active");
+            Debug.Log("✅ RealHintSystem が動作中");
+        }
+        else
+        {
+            UpdateStatus("❌ RealHintSystem not found - creating...");
+            CreateRealHintSystemDemo();
+        }
+        
+        HintSceneAutoSetup autoSetup = FindObjectOfType<HintSceneAutoSetup>();
+        if (autoSetup != null)
+        {
+            UpdateStatus("✅ HintSceneAutoSetup found");
+        }
+        else
+        {
+            UpdateStatus("Creating HintSceneAutoSetup...");
+            CreateHintSceneAutoSetupDemo();
+        }
+    }
+    
+    private void VerifyGameSceneComponents()
+    {
+        Debug.Log("[HintSystemDemo] GameScene コンポーネント検証中...");
+        
+        HintSystemLauncher launcher = FindObjectOfType<HintSystemLauncher>();
+        if (launcher != null)
+        {
+            UpdateStatus("✅ HintSystemLauncher found");
+            Debug.Log("✅ HintSystemLauncher が動作中");
+        }
+        else
+        {
+            UpdateStatus("❌ HintSystemLauncher not found - creating...");
+            CreateHintSystemLauncherDemo();
+        }
+        
+        CryptoGameManager gameManager = FindObjectOfType<CryptoGameManager>();
+        if (gameManager != null)
+        {
+            UpdateStatus("✅ CryptoGameManager found");
+            
+            if (gameManager.hintLauncher != null)
+            {
+                UpdateStatus("✅ CryptoGameManager integrated with HintLauncher");
+            }
+            else
+            {
+                UpdateStatus("Integrating HintLauncher with CryptoGameManager...");
+                gameManager.hintLauncher = launcher;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// ヒントシステム起動のデモ
+    /// </summary>
+    [ContextMenu("Demo Hint System Launch")]
+    public void DemoHintSystemLaunch()
+    {
+        UpdateStatus("Testing hint system launch...");
+        Debug.Log("[HintSystemDemo] ヒントシステム起動をテスト");
+        
+        HintSystemLauncher launcher = FindObjectOfType<HintSystemLauncher>();
+        if (launcher != null)
+        {
+            UpdateStatus("Launching hint system...");
+            launcher.LaunchHintSystem();
+        }
+        else
+        {
+            UpdateStatus("❌ HintSystemLauncher not available");
+            Debug.LogWarning("HintSystemLauncher が見つかりません");
+        }
+    }
+    
+    /// <summary>
+    /// シーン遷移のデモ
+    /// </summary>
+    [ContextMenu("Demo Scene Transition")]
+    public void DemoSceneTransition()
+    {
+        UpdateStatus("Testing scene transition...");
+        Debug.Log("[HintSystemDemo] シーン遷移をテスト");
+        
+        string currentScene = SceneManager.GetActiveScene().name;
+        
+        if (currentScene == "HintScene")
+        {
+            UpdateStatus("Returning to game scene...");
+            
+            RealHintSystem realHint = FindObjectOfType<RealHintSystem>();
+            if (realHint != null)
+            {
+                realHint.ReturnToMainGame();
+            }
+            else
+            {
+                SceneManager.LoadScene("Chapter_game");
+            }
+        }
+        else
+        {
+            UpdateStatus("Going to hint scene...");
+            
+            // カーソル状態保存
+            PlayerPrefs.SetString("PreviousScene", currentScene);
+            
+            SceneManager.LoadScene("HintScene");
+        }
+    }
+    
+    /// <summary>
+    /// カーソル管理のデモ
+    /// </summary>
+    [ContextMenu("Demo Cursor Management")]
+    public void DemoCursorManagement()
+    {
+        UpdateStatus("Testing cursor management...");
+        Debug.Log("[HintSystemDemo] カーソル管理をテスト");
+        
+        // 現在の状態を表示
+        Debug.Log($"Current cursor state - Visible: {Cursor.visible}, LockMode: {Cursor.lockState}");
+        
+        // UI用カーソル設定をテスト
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        
+        UpdateStatus($"Cursor set for UI: Visible={Cursor.visible}, Lock={Cursor.lockState}");
+        
+        // PlayerPrefsに保存をテスト
+        PlayerPrefs.SetInt("DemoCursorLockState", (int)Cursor.lockState);
+        PlayerPrefs.SetInt("DemoCursorVisible", Cursor.visible ? 1 : 0);
+        
+        Debug.Log("カーソル状態をPlayerPrefsに保存しました");
+    }
+    
+    /// <summary>
+    /// 完全なデモを実行
+    /// </summary>
+    [ContextMenu("Run Complete Demo")]
+    public void RunCompleteDemo()
+    {
+        UpdateStatus("Running complete demonstration...");
+        Debug.Log("[HintSystemDemo] 完全なデモンストレーションを実行");
+        
+        StartCoroutine(CompleteDemo());
+    }
+    
+    private System.Collections.IEnumerator CompleteDemo()
+    {
+        // 1. システム検証
+        UpdateStatus("Step 1: Verifying systems...");
+        VerifySystemComponents();
+        yield return new WaitForSeconds(2f);
+        
+        // 2. カーソル管理テスト
+        UpdateStatus("Step 2: Testing cursor management...");
+        DemoCursorManagement();
+        yield return new WaitForSeconds(2f);
+        
+        // 3. UI機能テスト
+        UpdateStatus("Step 3: Testing UI functionality...");
+        TestUIFunctionality();
+        yield return new WaitForSeconds(2f);
+        
+        // 4. ヒント内容テスト
+        UpdateStatus("Step 4: Testing hint content...");
+        TestHintContent();
+        yield return new WaitForSeconds(2f);
+        
+        // 5. 完了
+        UpdateStatus("✅ Complete demo finished successfully!");
+        Debug.Log("[HintSystemDemo] 完全なデモンストレーション完了");
+    }
+    
+    private void TestUIFunctionality()
+    {
+        Debug.Log("[HintSystemDemo] UI機能をテスト");
+        
+        // Canvas確認
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas != null)
+        {
+            Debug.Log("✅ Canvas available");
+        }
+        
+        // EventSystem確認
+        UnityEngine.EventSystems.EventSystem eventSystem = FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
+        if (eventSystem != null)
+        {
+            Debug.Log("✅ EventSystem available");
+        }
+        
+        // Font確認
+        Font defaultFont = UIUtility.GetDefaultFont();
+        if (defaultFont != null)
+        {
+            Debug.Log($"✅ Default font available: {defaultFont.name}");
+        }
+    }
+    
+    private void TestHintContent()
+    {
+        Debug.Log("[HintSystemDemo] ヒント内容をテスト");
+        
+        string currentScene = SceneManager.GetActiveScene().name;
+        
+        if (currentScene == "HintScene")
+        {
+            RealHintSystem realHint = FindObjectOfType<RealHintSystem>();
+            if (realHint != null)
+            {
+                Debug.Log("✅ RealHintSystem でヒント内容をテスト");
+                // テスト用にカテゴリボタンの存在を確認
+                Button[] buttons = FindObjectsOfType<Button>();
+                Debug.Log($"UI buttons found: {buttons.Length}");
+            }
+        }
+        else
+        {
+            Debug.Log("ヒント内容のテストにはHintSceneが必要です");
+        }
+    }
+    
+    private void UpdateStatus(string message)
+    {
+        currentStatus = message;
+        if (statusText != null)
+        {
+            statusText.text = $"Status: {message}\n\nControls:\nF1: Test Launch\nF2: Scene Transition\nF3: Cursor Demo\nF4: Complete Demo";
+        }
+        Debug.Log($"[HintSystemDemo] {message}");
+    }
+    
+    // デモ用作成関数
+    private void CreateRealHintSystemDemo()
+    {
+        GameObject obj = new GameObject("RealHintSystem (Demo)");
+        RealHintSystem system = obj.AddComponent<RealHintSystem>();
+        system.returnSceneName = PlayerPrefs.GetString("PreviousScene", "Chapter_game");
+        UpdateStatus("✅ RealHintSystem created for demo");
+    }
+    
+    private void CreateHintSystemLauncherDemo()
+    {
+        GameObject obj = new GameObject("HintSystemLauncher (Demo)");
+        HintSystemLauncher launcher = obj.AddComponent<HintSystemLauncher>();
+        launcher.hintSceneName = "HintScene";
+        UpdateStatus("✅ HintSystemLauncher created for demo");
+    }
+    
+    private void CreateHintSceneAutoSetupDemo()
+    {
+        GameObject obj = new GameObject("HintSceneAutoSetup (Demo)");
+        HintSceneAutoSetup setup = obj.AddComponent<HintSceneAutoSetup>();
+        setup.mainGameSceneName = "Chapter_game";
+        UpdateStatus("✅ HintSceneAutoSetup created for demo");
+    }
+    
+    void OnGUI()
+    {
+        // 画面右下にデモ情報を表示
+        GUI.Label(new Rect(Screen.width - 300, Screen.height - 150, 290, 140), 
+            $"=== Hint System Demo ===\n" +
+            $"Status: {currentStatus}\n" +
+            $"Scene: {SceneManager.GetActiveScene().name}\n" +
+            $"Cursor: Visible={Cursor.visible}\n" +
+            $"LockMode: {Cursor.lockState}");
+    }
+}

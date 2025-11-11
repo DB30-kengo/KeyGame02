@@ -110,10 +110,10 @@ public class CryptoAnswerCubeImproved : MonoBehaviour
             Font font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (font == null)
             {
-                // Arialフォントを試す（警告が出るが動作する場合がある）
+                // LegacyRuntimeフォントを試す
                 try 
                 {
-                    font = Resources.GetBuiltinResource<Font>("Arial.ttf");
+                    font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
                 }
                 catch 
                 {

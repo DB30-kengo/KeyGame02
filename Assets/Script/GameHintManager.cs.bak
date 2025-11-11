@@ -1,0 +1,825 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
+public class GameHintManager : MonoBehaviour
+{
+    [Header("UI References")]
+    [Tooltip("ヒント内容を表示するテキスト")]
+    public Text hintContentText;
+    
+    [Tooltip("ヒントタイトルを表示するテキスト")]
+    public Text hintTitleText;
+    
+    [Tooltip("ヒントカテゴリボタン配列")]
+    public Button[] categoryButtons;
+    
+    [Tooltip("ヒント内選択ボタン配列")]
+    public Button[] hintSelectionButtons;
+    
+    [Tooltip("戻るボタン")]
+    public Button backButton;
+    
+    [Tooltip("メインメニューに戻るボタン")]
+    public Button mainMenuButton;
+    
+    [Header("UI Panels")]
+    [Tooltip("カテゴリ選択パネル")]
+    public GameObject categoryPanel;
+    
+    [Tooltip("ヒント表示パネル")]
+    public GameObject hintDisplayPanel;
+    
+    [Tooltip("ヒント選択パネル")]
+    public GameObject hintSelectionPanel;
+    
+    [Header("Visual Settings")]
+    [Tooltip("選択中ボタンの色")]
+    public Color selectedButtonColor = Color.yellow;
+    
+    [Tooltip("通常ボタンの色")]
+    public Color normalButtonColor = Color.white;
+    
+    // 現在の状態管理
+    private HintCategory currentCategory = HintCategory.None;
+    private int currentHintIndex = 0;
+    
+    // ヒントデータ
+    private Dictionary<HintCategory, List<HintData>> hintDatabase;
+    
+    public enum HintCategory
+    {
+        None,
+        SymmetricKey,    // 共通鍵暗号
+        PublicKey,       // 公開鍵暗号
+        Hybrid,          // ハイブリッド暗号
+        GameControls,    // ゲーム操作
+        General          // 一般的なヒント
+    }
+    
+    [System.Serializable]
+    public class HintData
+    {
+        public string title;
+        [TextArea(3, 6)]
+        public string content;
+        
+        public HintData(string title, string content)
+        {
+            this.title = title;
+            this.content = content;
+        }
+    }
+    
+    void Start()
+    {
+        // ヒントシーン用にカーソルを設定
+        SetCursorForHintScene();
+        
+        InitializeHintDatabase();
+        SetupButtons();
+        
+        // PlayerPrefsから開始カテゴリを確認
+        if (PlayerPrefs.HasKey("HintCategory"))
+        {
+            int categoryIndex = PlayerPrefs.GetInt("HintCategory");
+            HintCategory category = (HintCategory)categoryIndex;
+            SelectCategory(category);
+        }
+        else
+        {
+            ShowCategorySelection();
+        }
+    }
+    
+    /// <summary>
+    /// ヒントデータベースを初期化
+    /// </summary>
+    private void InitializeHintDatabase()
+    {
+        hintDatabase = new Dictionary<HintCategory, List<HintData>>();
+        
+        // 共通鍵暗号のヒント
+        hintDatabase[HintCategory.SymmetricKey] = new List<HintData>
+        {
+            new HintData("共通鍵暗号とは？", 
+                "共通鍵暗号は、暗号化と復号に同じ鍵を使用する暗号方式です。\n\n" +
+                "特徴：\n" +
+                "• 暗号化が高速\n" +
+                "• 鍵の配送が課題\n" +
+                "• 対称暗号とも呼ばれる\n\n" +
+                "代表例：AES、DES"),
+                
+            new HintData("鍵配送問題", 
+                "共通鍵暗号の最大の課題は、安全に鍵を配送することです。\n\n" +
+                "問題点：\n" +
+                "• 事前に安全な経路で鍵を共有する必要がある\n" +
+                "• 通信相手が多いと鍵管理が複雑\n" +
+                "• 鍵が漏洩すると全ての通信が危険\n\n" +
+                "解決策：公開鍵暗号との組み合わせ"),
+                
+            new HintData("ゲーム内での表現", 
+                "ゲーム内では以下のように表現されます：\n\n" +
+                "1. 同じ鍵で暗号化・復号\n" +
+                "2. 鍵の事前共有が必要\n" +
+                "3. 高速な処理\n\n" +
+                "注目ポイント：\n" +
+                "• 鍵が一つだけ表示される\n" +
+                "• 送信者と受信者が同じ鍵を使用")
+        };
+        
+        // 公開鍵暗号のヒント
+        hintDatabase[HintCategory.PublicKey] = new List<HintData>
+        {
+            new HintData("公開鍵暗号とは？", 
+                "公開鍵暗号は、暗号化と復号に異なる鍵を使用する暗号方式です。\n\n" +
+                "特徴：\n" +
+                "• 公開鍵と秘密鍵のペア\n" +
+                "• 鍵配送問題を解決\n" +
+                "• 非対称暗号とも呼ばれる\n\n" +
+                "代表例：RSA、楕円曲線暗号"),
+                
+            new HintData("鍵ペアの仕組み", 
+                "公開鍵暗号では2つの鍵を使用します：\n\n" +
+                "公開鍵：\n" +
+                "• 誰でもアクセス可能\n" +
+                "• 暗号化に使用\n" +
+                "• 公開しても安全\n\n" +
+                "秘密鍵：\n" +
+                "• 所有者のみが保持\n" +
+                "• 復号に使用\n" +
+                "• 絶対に秘匿"),
+                
+            new HintData("暗号化の流れ", 
+                "公開鍵暗号での通信手順：\n\n" +
+                "1. 受信者が鍵ペアを生成\n" +
+                "2. 公開鍵を送信者に提供\n" +
+                "3. 送信者が公開鍵で暗号化\n" +
+                "4. 受信者が秘密鍵で復号\n\n" +
+                "ゲーム内では鍵の生成→配布→使用の流れを観察しましょう！"),
+                
+            new HintData("ゲーム内での表現", 
+                "ゲーム内では以下に注目：\n\n" +
+                "• 2つの鍵（公開鍵・秘密鍵）が表示\n" +
+                "• 鍵ペアの生成シーン\n" +
+                "• 公開鍵の配布過程\n" +
+                "• 異なる鍵での暗号化・復号\n\n" +
+                "色分けされた鍵で区別されています！")
+        };
+        
+        // ハイブリッド暗号のヒント
+        hintDatabase[HintCategory.Hybrid] = new List<HintData>
+        {
+            new HintData("ハイブリッド暗号とは？", 
+                "ハイブリッド暗号は、共通鍵暗号と公開鍵暗号を組み合わせた暗号方式です。\n\n" +
+                "目的：\n" +
+                "• 両方の長所を活用\n" +
+                "• 短所を補完\n" +
+                "• 実用的なセキュリティ\n\n" +
+                "現在のインターネット通信の主流方式です！"),
+                
+            new HintData("ハイブリッドの仕組み", 
+                "2段階の暗号化を行います：\n\n" +
+                "第1段階（公開鍵暗号）：\n" +
+                "• セッション鍵を暗号化\n" +
+                "• 鍵配送問題を解決\n\n" +
+                "第2段階（共通鍵暗号）：\n" +
+                "• 実際のデータを暗号化\n" +
+                "• 高速処理を実現\n\n" +
+                "両方の利点を獲得！"),
+                
+            new HintData("暗号化の手順", 
+                "ハイブリッド暗号の詳細手順：\n\n" +
+                "1. セッション鍵（共通鍵）を生成\n" +
+                "2. データをセッション鍵で暗号化\n" +
+                "3. セッション鍵を公開鍵で暗号化\n" +
+                "4. 両方を送信\n\n" +
+                "復号は逆の手順で行います"),
+                
+            new HintData("復号の手順", 
+                "受信側での復号手順：\n\n" +
+                "1. 秘密鍵でセッション鍵を復号\n" +
+                "2. 復号したセッション鍵でデータを復号\n" +
+                "3. 元のデータを取得\n\n" +
+                "ゲーム内では2段階の復号過程を観察できます！"),
+                
+            new HintData("実世界での利用", 
+                "ハイブリッド暗号の実用例：\n\n" +
+                "• HTTPS通信\n" +
+                "• メール暗号化\n" +
+                "• VPN通信\n" +
+                "• オンラインバンキング\n\n" +
+                "私たちの日常生活で広く使われています！")
+        };
+        
+        // ゲーム操作のヒント
+        hintDatabase[HintCategory.GameControls] = new List<HintData>
+        {
+            new HintData("基本操作", 
+                "ゲームの基本操作方法：\n\n" +
+                "移動：\n" +
+                "• WASD または 矢印キー\n" +
+                "• マウスでカメラ回転\n\n" +
+                "回答：\n" +
+                "• 3D回答キューブに触れる\n" +
+                "• または画面上のボタンをクリック"),
+                
+            new HintData("問題の進め方", 
+                "効果的な学習方法：\n\n" +
+                "1. 問題文をよく読む\n" +
+                "2. 3Dアニメーションを観察\n" +
+                "3. 鍵の動きに注目\n" +
+                "4. 暗号化の流れを理解\n" +
+                "5. 答えを選択\n\n" +
+                "焦らずじっくり観察しましょう！"),
+                
+            new HintData("リスポーン機能", 
+                "正解時のプレイヤーリセット：\n\n" +
+                "• 正解すると自動的に初期位置に戻る\n" +
+                "• 次の問題に集中できる\n" +
+                "• 回答キューブから離れる\n\n" +
+                "設定で高さや位置を調整可能です！")
+        };
+        
+        // 一般的なヒント
+        hintDatabase[HintCategory.General] = new List<HintData>
+        {
+            new HintData("学習のコツ", 
+                "効果的な暗号学習法：\n\n" +
+                "• アニメーションを注意深く観察\n" +
+                "• 鍵の動きと役割を理解\n" +
+                "• 間違いを恐れずに挑戦\n" +
+                "• 解説をしっかり読む\n\n" +
+                "繰り返し学習が重要です！"),
+                
+            new HintData("暗号の重要性", 
+                "現代社会における暗号：\n\n" +
+                "• 個人情報の保護\n" +
+                "• オンライン取引の安全性\n" +
+                "• 国家機密の保護\n" +
+                "• デジタル社会の基盤\n\n" +
+                "暗号技術は現代の必須知識です！"),
+                
+            new HintData("さらなる学習", 
+                "このゲーム後の学習リソース：\n\n" +
+                "• 暗号理論の専門書\n" +
+                "• オンライン暗号学コース\n" +
+                "• セキュリティ関連の資格\n" +
+                "• 実装練習\n\n" +
+                "継続的な学習で専門知識を深めましょう！")
+        };
+    }
+    
+    /// <summary>
+    /// ボタンのイベント設定
+    /// </summary>
+    private void SetupButtons()
+    {
+        Debug.Log("[GameHintManager] Setting up button events...");
+        
+        // UI要素の自動検索・設定
+        AutoDetectUIElements();
+        
+        // カテゴリボタンの設定
+        if (categoryButtons != null && categoryButtons.Length >= 5)
+        {
+            for (int i = 0; i < 5; i++)
+            {
+                if (categoryButtons[i] != null)
+                {
+                    int categoryIndex = i; // クロージャ対応
+                    categoryButtons[i].onClick.RemoveAllListeners();
+                    categoryButtons[i].onClick.AddListener(() => {
+                        Debug.Log($"[GameHintManager] Category button {categoryIndex} clicked");
+                        SelectCategory((HintCategory)(categoryIndex + 1));
+                    });
+                    Debug.Log($"[GameHintManager] Category button {i} event set");
+                }
+                else
+                {
+                    Debug.LogWarning($"[GameHintManager] Category button {i} is null");
+                }
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Category buttons array is null or insufficient length");
+        }
+        
+        // ヒント選択ボタンの設定
+        if (hintSelectionButtons != null)
+        {
+            for (int i = 0; i < hintSelectionButtons.Length; i++)
+            {
+                if (hintSelectionButtons[i] != null)
+                {
+                    int index = i; // クロージャ対応
+                    hintSelectionButtons[i].onClick.RemoveAllListeners();
+                    hintSelectionButtons[i].onClick.AddListener(() => {
+                        Debug.Log($"[GameHintManager] Hint selection button {index} clicked");
+                        ShowHint(index);
+                    });
+                    Debug.Log($"[GameHintManager] Hint selection button {i} event set");
+                }
+                else
+                {
+                    Debug.LogWarning($"[GameHintManager] Hint selection button {i} is null");
+                }
+            }
+        }
+        
+        // 戻るボタン
+        if (backButton != null)
+        {
+            backButton.onClick.RemoveAllListeners();
+            backButton.onClick.AddListener(() => {
+                Debug.Log("[GameHintManager] Back button clicked");
+                GoBack();
+            });
+            Debug.Log("[GameHintManager] Back button event set");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Back button is null");
+        }
+        
+        // メインメニューボタン
+        if (mainMenuButton != null)
+        {
+            mainMenuButton.onClick.RemoveAllListeners();
+            mainMenuButton.onClick.AddListener(() => {
+                Debug.Log("[GameHintManager] Main menu button clicked");
+                GoToMainMenu();
+            });
+            Debug.Log("[GameHintManager] Main menu button event set");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Main menu button is null");
+        }
+        
+        Debug.Log("[GameHintManager] Button setup completed");
+    }
+    
+    /// <summary>
+    /// UI要素の自動検出
+    /// </summary>
+    private void AutoDetectUIElements()
+    {
+        Debug.Log("[GameHintManager] Auto-detecting UI elements...");
+        
+        // Canvas検索
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            Debug.LogError("[GameHintManager] Canvas not found!");
+            return;
+        }
+        
+        // ヒント内容テキストの自動検出
+        if (hintContentText == null)
+        {
+            hintContentText = FindUIElementByName<Text>("HintContent", "ヒント内容", "Content");
+            if (hintContentText != null)
+                Debug.Log("[GameHintManager] Auto-detected hint content text");
+        }
+        
+        // ヒントタイトルテキストの自動検出
+        if (hintTitleText == null)
+        {
+            hintTitleText = FindUIElementByName<Text>("HintTitle", "ヒントタイトル", "Title");
+            if (hintTitleText != null)
+                Debug.Log("[GameHintManager] Auto-detected hint title text");
+        }
+        
+        // カテゴリボタンの自動検出
+        if (categoryButtons == null || categoryButtons.Length < 5)
+        {
+            categoryButtons = new Button[5];
+            string[] categoryNames = { "共通鍵", "公開鍵", "ハイブリッド", "ゲーム操作", "一般" };
+            
+            for (int i = 0; i < 5; i++)
+            {
+                categoryButtons[i] = FindUIElementByName<Button>(
+                    $"Button_{categoryNames[i]}", 
+                    categoryNames[i],
+                    $"Category{i}",
+                    $"CategoryButton{i}"
+                );
+                
+                if (categoryButtons[i] != null)
+                    Debug.Log($"[GameHintManager] Auto-detected category button {i}: {categoryNames[i]}");
+            }
+        }
+        
+        // ヒント選択ボタンの自動検出
+        if (hintSelectionButtons == null || hintSelectionButtons.Length < 6)
+        {
+            hintSelectionButtons = new Button[6];
+            
+            for (int i = 0; i < 6; i++)
+            {
+                hintSelectionButtons[i] = FindUIElementByName<Button>(
+                    $"Button_ヒント{i + 1}",
+                    $"ヒント{i + 1}",
+                    $"Hint{i}",
+                    $"HintButton{i}"
+                );
+                
+                if (hintSelectionButtons[i] != null)
+                    Debug.Log($"[GameHintManager] Auto-detected hint selection button {i}");
+            }
+        }
+        
+        // 戻るボタンの自動検出
+        if (backButton == null)
+        {
+            backButton = FindUIElementByName<Button>("戻る", "Back", "← 戻る", "Button_戻る");
+            if (backButton != null)
+                Debug.Log("[GameHintManager] Auto-detected back button");
+        }
+        
+        // メインメニューボタンの自動検出
+        if (mainMenuButton == null)
+        {
+            mainMenuButton = FindUIElementByName<Button>("メインメニュー", "MainMenu", "Button_メインメニュー");
+            if (mainMenuButton != null)
+                Debug.Log("[GameHintManager] Auto-detected main menu button");
+        }
+        
+        // パネルの自動検出
+        if (categoryPanel == null)
+        {
+            categoryPanel = FindGameObjectByName("CategoryPanel", "カテゴリパネル", "Category");
+            if (categoryPanel != null)
+                Debug.Log("[GameHintManager] Auto-detected category panel");
+        }
+        
+        if (hintSelectionPanel == null)
+        {
+            hintSelectionPanel = FindGameObjectByName("HintSelectionPanel", "ヒント選択パネル", "Selection");
+            if (hintSelectionPanel != null)
+                Debug.Log("[GameHintManager] Auto-detected hint selection panel");
+        }
+        
+        if (hintDisplayPanel == null)
+        {
+            hintDisplayPanel = FindGameObjectByName("HintDisplayPanel", "ヒント表示パネル", "Display");
+            if (hintDisplayPanel != null)
+                Debug.Log("[GameHintManager] Auto-detected hint display panel");
+        }
+        
+        Debug.Log("[GameHintManager] Auto-detection completed");
+    }
+    
+    /// <summary>
+    /// 複数の名前候補でUI要素を検索
+    /// </summary>
+    private T FindUIElementByName<T>(params string[] names) where T : Component
+    {
+        foreach (string name in names)
+        {
+            GameObject obj = GameObject.Find(name);
+            if (obj != null)
+            {
+                T component = obj.GetComponent<T>();
+                if (component != null)
+                {
+                    return component;
+                }
+            }
+        }
+        
+        // 名前に含まれる検索も試行
+        T[] allComponents = FindObjectsOfType<T>();
+        foreach (T component in allComponents)
+        {
+            foreach (string name in names)
+            {
+                if (component.name.Contains(name))
+                {
+                    return component;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// 複数の名前候補でGameObjectを検索
+    /// </summary>
+    private GameObject FindGameObjectByName(params string[] names)
+    {
+        foreach (string name in names)
+        {
+            GameObject obj = GameObject.Find(name);
+            if (obj != null)
+            {
+                return obj;
+            }
+        }
+        
+        // 名前に含まれる検索も試行
+        GameObject[] allObjects = FindObjectsOfType<GameObject>();
+        foreach (GameObject obj in allObjects)
+        {
+            foreach (string name in names)
+            {
+                if (obj.name.Contains(name))
+                {
+                    return obj;
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// カテゴリ選択画面を表示
+    /// </summary>
+    public void ShowCategorySelection()
+    {
+        currentCategory = HintCategory.None;
+        
+        if (categoryPanel != null) categoryPanel.SetActive(true);
+        if (hintSelectionPanel != null) hintSelectionPanel.SetActive(false);
+        if (hintDisplayPanel != null) hintDisplayPanel.SetActive(false);
+        
+        // カテゴリボタンのテキスト設定
+        if (categoryButtons.Length >= 5)
+        {
+            SetButtonText(categoryButtons[0], "共通鍵暗号");
+            SetButtonText(categoryButtons[1], "公開鍵暗号");
+            SetButtonText(categoryButtons[2], "ハイブリッド暗号");
+            SetButtonText(categoryButtons[3], "ゲーム操作");
+            SetButtonText(categoryButtons[4], "一般的なヒント");
+        }
+    }
+    
+    /// <summary>
+    /// カテゴリを選択
+    /// </summary>
+    public void SelectCategory(HintCategory category)
+    {
+        Debug.Log($"[GameHintManager] SelectCategory called with: {category}");
+        currentCategory = category;
+        ShowHintSelection();
+    }
+    
+    /// <summary>
+    /// ヒント選択画面を表示
+    /// </summary>
+    private void ShowHintSelection()
+    {
+        Debug.Log($"[GameHintManager] ShowHintSelection called for category: {currentCategory}");
+        
+        if (categoryPanel != null) 
+        {
+            categoryPanel.SetActive(false);
+            Debug.Log("[GameHintManager] Category panel hidden");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Category panel is null");
+        }
+        
+        if (hintSelectionPanel != null) 
+        {
+            hintSelectionPanel.SetActive(true);
+            Debug.Log("[GameHintManager] Hint selection panel shown");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Hint selection panel is null");
+        }
+        
+        if (hintDisplayPanel != null) 
+        {
+            hintDisplayPanel.SetActive(false);
+            Debug.Log("[GameHintManager] Hint display panel hidden");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Hint display panel is null");
+        }
+        
+        // 選択されたカテゴリのヒント一覧を表示
+        if (hintDatabase != null && hintDatabase.ContainsKey(currentCategory))
+        {
+            List<HintData> hints = hintDatabase[currentCategory];
+            Debug.Log($"[GameHintManager] Found {hints.Count} hints for category {currentCategory}");
+            
+            if (hintSelectionButtons != null)
+            {
+                for (int i = 0; i < hintSelectionButtons.Length; i++)
+                {
+                    if (hintSelectionButtons[i] != null)
+                    {
+                        if (i < hints.Count)
+                        {
+                            hintSelectionButtons[i].gameObject.SetActive(true);
+                            SetButtonText(hintSelectionButtons[i], hints[i].title);
+                            Debug.Log($"[GameHintManager] Set hint button {i}: {hints[i].title}");
+                        }
+                        else
+                        {
+                            hintSelectionButtons[i].gameObject.SetActive(false);
+                        }
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"[GameHintManager] Hint selection button {i} is null");
+                    }
+                }
+            }
+            else
+            {
+                Debug.LogWarning("[GameHintManager] Hint selection buttons array is null");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"[GameHintManager] No hints found for category: {currentCategory}");
+        }
+    }
+    
+    /// <summary>
+    /// 指定されたヒントを表示
+    /// </summary>
+    public void ShowHint(int hintIndex)
+    {
+        Debug.Log($"[GameHintManager] ShowHint called with index: {hintIndex}, category: {currentCategory}");
+        
+        if (hintDatabase == null || !hintDatabase.ContainsKey(currentCategory))
+        {
+            Debug.LogWarning($"[GameHintManager] No hints found for category: {currentCategory}");
+            return;
+        }
+        
+        List<HintData> hints = hintDatabase[currentCategory];
+        if (hintIndex >= hints.Count)
+        {
+            Debug.LogWarning($"[GameHintManager] Hint index {hintIndex} out of range (max: {hints.Count - 1})");
+            return;
+        }
+        
+        currentHintIndex = hintIndex;
+        HintData hint = hints[hintIndex];
+        
+        Debug.Log($"[GameHintManager] Displaying hint: {hint.title}");
+        
+        if (categoryPanel != null) 
+        {
+            categoryPanel.SetActive(false);
+            Debug.Log("[GameHintManager] Category panel hidden");
+        }
+        
+        if (hintSelectionPanel != null) 
+        {
+            hintSelectionPanel.SetActive(false);
+            Debug.Log("[GameHintManager] Hint selection panel hidden");
+        }
+        
+        if (hintDisplayPanel != null) 
+        {
+            hintDisplayPanel.SetActive(true);
+            Debug.Log("[GameHintManager] Hint display panel shown");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Hint display panel is null");
+        }
+        
+        if (hintTitleText != null) 
+        {
+            hintTitleText.text = hint.title;
+            Debug.Log($"[GameHintManager] Set hint title: {hint.title}");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Hint title text is null");
+        }
+        
+        if (hintContentText != null) 
+        {
+            hintContentText.text = hint.content;
+            Debug.Log($"[GameHintManager] Set hint content: {hint.content.Substring(0, Mathf.Min(50, hint.content.Length))}...");
+        }
+        else
+        {
+            Debug.LogWarning("[GameHintManager] Hint content text is null");
+        }
+    }
+    
+    /// <summary>
+    /// 戻る処理
+    /// </summary>
+    public void GoBack()
+    {
+        if (hintDisplayPanel != null && hintDisplayPanel.activeSelf)
+        {
+            // ヒント表示→ヒント選択
+            ShowHintSelection();
+        }
+        else if (hintSelectionPanel != null && hintSelectionPanel.activeSelf)
+        {
+            // ヒント選択→カテゴリ選択
+            ShowCategorySelection();
+        }
+        else
+        {
+            // カテゴリ選択→元のシーンに戻る
+            ReturnToPreviousScene();
+        }
+    }
+    
+    /// <summary>
+    /// メインメニューに戻る
+    /// </summary>
+    public void GoToMainMenu()
+    {
+        // メインメニューシーンがあれば戻る、なければ元のシーンに戻る
+        string mainMenuScene = "MainMenu";
+        if (Application.CanStreamedLevelBeLoaded(mainMenuScene))
+        {
+            SceneManager.LoadScene(mainMenuScene);
+        }
+        else
+        {
+            ReturnToPreviousScene();
+        }
+    }
+    
+    /// <summary>
+    /// ボタンのテキストを設定
+    /// </summary>
+    private void SetButtonText(Button button, string text)
+    {
+        if (button != null)
+        {
+            Text buttonText = button.GetComponentInChildren<Text>();
+            if (buttonText != null)
+            {
+                buttonText.text = text;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 外部からカテゴリを設定（他シーンからの呼び出し用）
+    /// </summary>
+    public void SetCategoryFromExternal(int categoryIndex)
+    {
+        HintCategory category = (HintCategory)(categoryIndex + 1);
+        SelectCategory(category);
+    }
+    
+    /// <summary>
+    /// 元のシーンに戻る
+    /// </summary>
+    private void ReturnToPreviousScene()
+    {
+        string returnScene = PlayerPrefs.GetString("ReturnScene", "SampleScene");
+        
+        Debug.Log($"[GameHintManager] Returning to scene: {returnScene}");
+        
+        try
+        {
+            // カーソル状態を復元
+            HintSceneTransition.RestoreCursorState();
+            
+            // PlayerPrefsをクリア
+            PlayerPrefs.DeleteKey("HintCategory");
+            PlayerPrefs.Save();
+            
+            if (Application.CanStreamedLevelBeLoaded(returnScene))
+            {
+                SceneManager.LoadScene(returnScene);
+            }
+            else
+            {
+                Debug.LogWarning($"[GameHintManager] Cannot return to '{returnScene}', loading first scene in build settings.");
+                SceneManager.LoadScene(0);
+            }
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogError($"[GameHintManager] Error returning to previous scene: {e.Message}");
+            SceneManager.LoadScene(0);
+        }
+    }
+    
+    /// <summary>
+    /// ヒントシーン用にカーソルを設定
+    /// </summary>
+    private void SetCursorForHintScene()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        Debug.Log("[GameHintManager] Cursor set for hint scene - LockState: None, Visible: true");
+    }
+}

@@ -1,0 +1,436 @@
+using UnityEngine;
+using UnityEngine.UI;
+
+/// <summary>
+/// ヒントシーンのUI自動生成ヘルパー
+/// </summary>
+public class HintUIGenerator : MonoBehaviour
+{
+    [Header("Auto Generation Settings")]
+    [Tooltip("UI生成ボタン")]
+    public bool generateUI = false;
+    
+    [Header("UI Prefab References")]
+    [Tooltip("ボタンプレハブ")]
+    public Button buttonPrefab;
+    
+    [Tooltip("パネルプレハブ")]
+    public GameObject panelPrefab;
+    
+    [Header("Component References")]
+    [Tooltip("親Canvas（自動検索される）")]
+    public Canvas parentCanvas;
+    
+    [Tooltip("GameHintManager（自動検索される）")]
+    public GameHintManager hintManager;
+    
+    void Start()
+    {
+        if (generateUI)
+        {
+            GenerateHintUI();
+        }
+    }
+    
+    /// <summary>
+    /// ヒント画面のUIを自動生成
+    /// </summary>
+    [ContextMenu("Generate Hint UI")]
+    public void GenerateHintUI()
+    {
+        // Canvasの自動検索
+        if (parentCanvas == null)
+        {
+            parentCanvas = FindObjectOfType<Canvas>();
+        }
+        
+        if (parentCanvas == null)
+        {
+            Debug.LogError("Canvas が見つかりません。Canvasを作成してください。");
+            return;
+        }
+        
+        Canvas canvas = parentCanvas;
+        
+        // メインパネル作成
+        GameObject mainPanel = new GameObject("HintMainPanel");
+        mainPanel.transform.SetParent(canvas.transform, false);
+        
+        RectTransform mainRect = mainPanel.AddComponent<RectTransform>();
+        mainRect.anchorMin = Vector2.zero;
+        mainRect.anchorMax = Vector2.one;
+        mainRect.offsetMin = Vector2.zero;
+        mainRect.offsetMax = Vector2.zero;
+        
+        Image mainImage = mainPanel.AddComponent<Image>();
+        mainImage.color = new Color(0.1f, 0.1f, 0.2f, 0.9f);
+        
+        // 1. カテゴリ選択パネル作成
+        CreateCategoryPanel(mainPanel.transform);
+        
+        // 2. ヒント選択パネル作成
+        CreateHintSelectionPanel(mainPanel.transform);
+        
+        // 3. ヒント表示パネル作成
+        CreateHintDisplayPanel(mainPanel.transform);
+        
+        // 4. ナビゲーションボタン作成
+        CreateNavigationButtons(mainPanel.transform);
+        
+        // 5. GameHintManagerとの連携設定
+        SetupGameHintManager();
+        
+        // 6. ヒントシーン用にカーソルを設定
+        SetCursorForHintScene();
+        
+        Debug.Log("ヒントUIの生成が完了しました！GameHintManagerが自動設定されました。");
+    }
+    
+    private void CreateCategoryPanel(Transform parent)
+    {
+        GameObject categoryPanel = new GameObject("CategoryPanel");
+        categoryPanel.transform.SetParent(parent, false);
+        
+        RectTransform rect = categoryPanel.AddComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // タイトル
+        GameObject title = new GameObject("Title");
+        title.transform.SetParent(categoryPanel.transform, false);
+        Text titleText = title.AddComponent<Text>();
+        titleText.text = "ヒントカテゴリ選択";
+        titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        titleText.fontSize = 36;
+        titleText.alignment = TextAnchor.MiddleCenter;
+        titleText.color = Color.white;
+        
+        RectTransform titleRect = title.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0, 0.8f);
+        titleRect.anchorMax = new Vector2(1, 1);
+        titleRect.offsetMin = Vector2.zero;
+        titleRect.offsetMax = Vector2.zero;
+        
+        // カテゴリボタン配置
+        string[] categoryNames = { "共通鍵暗号", "公開鍵暗号", "ハイブリッド暗号", "ゲーム操作", "一般ヒント" };
+        
+        for (int i = 0; i < categoryNames.Length; i++)
+        {
+            GameObject button = CreateButton(categoryNames[i], categoryPanel.transform);
+            button.name = $"CategoryButton_{i}"; // 識別可能な名前を設定
+            
+            RectTransform buttonRect = button.GetComponent<RectTransform>();
+            
+            float yPos = 0.65f - (i * 0.12f);
+            buttonRect.anchorMin = new Vector2(0.3f, yPos - 0.05f);
+            buttonRect.anchorMax = new Vector2(0.7f, yPos + 0.05f);
+            buttonRect.offsetMin = Vector2.zero;
+            buttonRect.offsetMax = Vector2.zero;
+        }
+    }
+    
+    private void CreateHintSelectionPanel(Transform parent)
+    {
+        GameObject selectionPanel = new GameObject("HintSelectionPanel");
+        selectionPanel.transform.SetParent(parent, false);
+        selectionPanel.SetActive(false);
+        
+        RectTransform rect = selectionPanel.AddComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // タイトル
+        GameObject title = new GameObject("SelectionTitle");
+        title.transform.SetParent(selectionPanel.transform, false);
+        Text titleText = title.AddComponent<Text>();
+        titleText.text = "ヒント選択";
+        titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        titleText.fontSize = 32;
+        titleText.alignment = TextAnchor.MiddleCenter;
+        titleText.color = Color.white;
+        
+        RectTransform titleRect = title.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0, 0.8f);
+        titleRect.anchorMax = new Vector2(1, 1);
+        titleRect.offsetMin = Vector2.zero;
+        titleRect.offsetMax = Vector2.zero;
+        
+        // ヒント選択ボタン（最大6個）
+        for (int i = 0; i < 6; i++)
+        {
+            GameObject button = CreateButton($"ヒント {i + 1}", selectionPanel.transform);
+            button.name = $"HintSelectionButton_{i}"; // 識別可能な名前を設定
+            
+            RectTransform buttonRect = button.GetComponent<RectTransform>();
+            
+            float yPos = 0.65f - (i * 0.1f);
+            buttonRect.anchorMin = new Vector2(0.2f, yPos - 0.04f);
+            buttonRect.anchorMax = new Vector2(0.8f, yPos + 0.04f);
+            buttonRect.offsetMin = Vector2.zero;
+            buttonRect.offsetMax = Vector2.zero;
+        }
+    }
+    
+    private void CreateHintDisplayPanel(Transform parent)
+    {
+        GameObject displayPanel = new GameObject("HintDisplayPanel");
+        displayPanel.transform.SetParent(parent, false);
+        displayPanel.SetActive(false);
+        
+        RectTransform rect = displayPanel.AddComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // ヒントタイトル
+        GameObject title = new GameObject("HintTitle");
+        title.transform.SetParent(displayPanel.transform, false);
+        Text titleText = title.AddComponent<Text>();
+        titleText.text = "ヒントタイトル";
+        titleText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        titleText.fontSize = 28;
+        titleText.alignment = TextAnchor.MiddleCenter;
+        titleText.color = Color.yellow;
+        
+        RectTransform titleRect = title.GetComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0, 0.85f);
+        titleRect.anchorMax = new Vector2(1, 0.95f);
+        titleRect.offsetMin = Vector2.zero;
+        titleRect.offsetMax = Vector2.zero;
+        
+        // ヒント内容エリア
+        GameObject contentArea = new GameObject("ContentArea");
+        contentArea.transform.SetParent(displayPanel.transform, false);
+        
+        RectTransform contentRect = contentArea.AddComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0.1f, 0.2f);
+        contentRect.anchorMax = new Vector2(0.9f, 0.8f);
+        contentRect.offsetMin = Vector2.zero;
+        contentRect.offsetMax = Vector2.zero;
+        
+        Image contentBg = contentArea.AddComponent<Image>();
+        contentBg.color = new Color(0, 0, 0, 0.7f);
+        
+        // スクロール可能なテキストエリア
+        GameObject scrollView = new GameObject("ScrollView");
+        scrollView.transform.SetParent(contentArea.transform, false);
+        
+        RectTransform scrollRect = scrollView.AddComponent<RectTransform>();
+        scrollRect.anchorMin = Vector2.zero;
+        scrollRect.anchorMax = Vector2.one;
+        scrollRect.offsetMin = Vector2.zero;
+        scrollRect.offsetMax = Vector2.zero;
+        
+        ScrollRect scroll = scrollView.AddComponent<ScrollRect>();
+        
+        // ビューポート
+        GameObject viewport = new GameObject("Viewport");
+        viewport.transform.SetParent(scrollView.transform, false);
+        
+        RectTransform viewportRect = viewport.AddComponent<RectTransform>();
+        viewportRect.anchorMin = Vector2.zero;
+        viewportRect.anchorMax = Vector2.one;
+        viewportRect.offsetMin = Vector2.zero;
+        viewportRect.offsetMax = Vector2.zero;
+        
+        Mask viewportMask = viewport.AddComponent<Mask>();
+        viewport.AddComponent<Image>();
+        
+        // コンテンツテキスト
+        GameObject contentText = new GameObject("HintContent");
+        contentText.transform.SetParent(viewport.transform, false);
+        
+        Text content = contentText.AddComponent<Text>();
+        content.text = "ここにヒント内容が表示されます";
+        content.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        content.fontSize = 20;
+        content.alignment = TextAnchor.UpperLeft;
+        content.color = Color.white;
+        
+        RectTransform contentTextRect = contentText.GetComponent<RectTransform>();
+        contentTextRect.anchorMin = new Vector2(0, 0);
+        contentTextRect.anchorMax = new Vector2(1, 1);
+        contentTextRect.offsetMin = new Vector2(10, 10);
+        contentTextRect.offsetMax = new Vector2(-10, -10);
+        
+        ContentSizeFitter fitter = contentText.AddComponent<ContentSizeFitter>();
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        
+        scroll.content = contentTextRect;
+        scroll.viewport = viewportRect;
+    }
+    
+    private void CreateNavigationButtons(Transform parent)
+    {
+        // 戻るボタン
+        GameObject backButton = CreateButton("← 戻る", parent);
+        RectTransform backRect = backButton.GetComponent<RectTransform>();
+        backRect.anchorMin = new Vector2(0.05f, 0.05f);
+        backRect.anchorMax = new Vector2(0.25f, 0.15f);
+        backRect.offsetMin = Vector2.zero;
+        backRect.offsetMax = Vector2.zero;
+        
+        // メインメニューボタン
+        GameObject menuButton = CreateButton("メインメニュー", parent);
+        RectTransform menuRect = menuButton.GetComponent<RectTransform>();
+        menuRect.anchorMin = new Vector2(0.75f, 0.05f);
+        menuRect.anchorMax = new Vector2(0.95f, 0.15f);
+        menuRect.offsetMin = Vector2.zero;
+        menuRect.offsetMax = Vector2.zero;
+    }
+    
+    private GameObject CreateButton(string text, Transform parent)
+    {
+        GameObject button = new GameObject($"Button_{text}");
+        button.transform.SetParent(parent, false);
+        
+        Image image = button.AddComponent<Image>();
+        image.color = new Color(0.3f, 0.6f, 1f, 0.8f);
+        
+        Button btn = button.AddComponent<Button>();
+        
+        // ボタンテキスト
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(button.transform, false);
+        
+        Text buttonText = textObj.AddComponent<Text>();
+        buttonText.text = text;
+        buttonText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        buttonText.fontSize = 18;
+        buttonText.alignment = TextAnchor.MiddleCenter;
+        buttonText.color = Color.white;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        return button;
+    }
+    
+    /// <summary>
+    /// GameHintManagerとの連携を自動設定
+    /// </summary>
+    private void SetupGameHintManager()
+    {
+        // GameHintManagerを自動検索
+        if (hintManager == null)
+        {
+            hintManager = FindObjectOfType<GameHintManager>();
+        }
+        
+        if (hintManager == null)
+        {
+            Debug.Log("[HintUIGenerator] GameHintManagerが見つかりません。自動作成します。");
+            GameObject hintManagerObj = new GameObject("GameHintManager");
+            hintManager = hintManagerObj.AddComponent<GameHintManager>();
+        }
+        
+        // UI参照を自動設定
+        AutoAssignUIReferences();
+        
+        Debug.Log("[HintUIGenerator] GameHintManagerとの連携設定が完了しました。");
+    }
+    
+    /// <summary>
+    /// GameHintManagerのUI参照を自動設定
+    /// </summary>
+    private void AutoAssignUIReferences()
+    {
+        if (hintManager == null) return;
+        
+        // UI要素を検索して自動設定
+        Text hintContentText = GameObject.Find("HintContent")?.GetComponent<Text>();
+        Text hintTitleText = GameObject.Find("HintTitle")?.GetComponent<Text>();
+        GameObject categoryPanel = GameObject.Find("CategoryPanel");
+        GameObject hintDisplayPanel = GameObject.Find("HintDisplayPanel");
+        GameObject hintSelectionPanel = GameObject.Find("HintSelectionPanel");
+        
+        // カテゴリボタンを検索
+        Button[] categoryButtons = new Button[5];
+        for (int i = 0; i < 5; i++)
+        {
+            GameObject buttonObj = GameObject.Find($"CategoryButton_{i}");
+            if (buttonObj != null)
+            {
+                categoryButtons[i] = buttonObj.GetComponent<Button>();
+            }
+        }
+        
+        // ヒント選択ボタンを検索
+        Button[] hintSelectionButtons = new Button[6];
+        for (int i = 0; i < 6; i++)
+        {
+            GameObject buttonObj = GameObject.Find($"HintSelectionButton_{i}");
+            if (buttonObj != null)
+            {
+                hintSelectionButtons[i] = buttonObj.GetComponent<Button>();
+            }
+        }
+        
+        // 戻るボタンとメインメニューボタン
+        Button backButton = GameObject.Find("← 戻る")?.GetComponent<Button>();
+        Button mainMenuButton = GameObject.Find("メインメニュー")?.GetComponent<Button>();
+        
+        // リフレクションを使用してGameHintManagerのフィールドを設定
+        var hintManagerType = typeof(GameHintManager);
+        
+        // プライベートフィールドへのアクセスに必要
+        var bindingFlags = System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+        
+        try
+        {
+            SetField("hintContentText", hintContentText);
+            SetField("hintTitleText", hintTitleText);
+            SetField("categoryButtons", categoryButtons);
+            SetField("hintSelectionButtons", hintSelectionButtons);
+            SetField("backButton", backButton);
+            SetField("mainMenuButton", mainMenuButton);
+            SetField("categoryPanel", categoryPanel);
+            SetField("hintDisplayPanel", hintDisplayPanel);
+            SetField("hintSelectionPanel", hintSelectionPanel);
+            
+            Debug.Log("[HintUIGenerator] UI参照の自動設定が完了しました。");
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[HintUIGenerator] UI参照の自動設定中にエラーが発生しました: {e.Message}");
+            Debug.Log("[HintUIGenerator] 手動でGameHintManagerのInspectorで設定してください。");
+        }
+    }
+    
+    /// <summary>
+    /// リフレクションを使用してフィールドを設定
+    /// </summary>
+    private void SetField(string fieldName, object value)
+    {
+        var field = typeof(GameHintManager).GetField(fieldName, 
+            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+        
+        if (field != null && value != null)
+        {
+            field.SetValue(hintManager, value);
+            Debug.Log($"[HintUIGenerator] {fieldName} を設定しました。");
+        }
+        else if (field == null)
+        {
+            Debug.LogWarning($"[HintUIGenerator] フィールド '{fieldName}' が見つかりません。");
+        }
+    }
+    
+    /// <summary>
+    /// ヒントシーン用にカーソルを設定
+    /// </summary>
+    private void SetCursorForHintScene()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        Debug.Log("[HintUIGenerator] Cursor set for hint scene - LockState: None, Visible: true");
+    }
+}

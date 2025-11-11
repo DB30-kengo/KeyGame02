@@ -1,0 +1,201 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+
+/// <summary>
+/// ヒント詳細表示問題の簡単修正ツール
+/// シーンでF2を押すとヒント詳細が表示されるかテストします
+/// </summary>
+public class QuickHintDetailFix : MonoBehaviour
+{
+    private RealHintSystem realHintSystem;
+    
+    void Start()
+    {
+        Debug.Log("[QuickHintDetailFix] F2でヒント詳細テスト、F3でUI状態確認、F4でフォントテスト");
+    }
+    
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F2))
+        {
+            TestHintDetailDirectly();
+        }
+        
+        if (Input.GetKeyDown(KeyCode.F3))
+        {
+            CheckUIState();
+        }
+        
+        if (Input.GetKeyDown(KeyCode.F4))
+        {
+            TestFontSystem();
+        }
+    }
+    
+    void TestHintDetailDirectly()
+    {
+        Debug.Log("[QuickHintDetailFix] Testing hint detail directly...");
+        
+        // RealHintSystemを探すか作成
+        realHintSystem = FindObjectOfType<RealHintSystem>();
+        if (realHintSystem == null)
+        {
+            GameObject hintObj = new GameObject("QuickTestHintSystem");
+            realHintSystem = hintObj.AddComponent<RealHintSystem>();
+        }
+        
+        // カーソル設定
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        
+        // ヒントシステムを起動
+        realHintSystem.ShowHintSystem();
+        
+        // 少し待ってから詳細表示をテスト
+        StartCoroutine(ShowHintDetailAfterDelay());
+    }
+    
+    System.Collections.IEnumerator ShowHintDetailAfterDelay()
+    {
+        yield return new WaitForSeconds(0.5f);
+        
+        // 共通鍵暗号カテゴリのヒント詳細を直接表示
+        // Reflectionを使って直接呼び出し
+        var showCategoryMethod = typeof(RealHintSystem).GetMethod("ShowCategoryHints", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (showCategoryMethod != null)
+        {
+            showCategoryMethod.Invoke(realHintSystem, new object[] { "symmetric", "共通鍵暗号" });
+        }
+        
+        yield return new WaitForSeconds(0.5f);
+        
+        var showDetailMethod = typeof(RealHintSystem).GetMethod("ShowHintDetail", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        if (showDetailMethod != null)
+        {
+            showDetailMethod.Invoke(realHintSystem, new object[] { 0 });
+            Debug.Log("[QuickHintDetailFix] Hint detail method invoked!");
+        }
+    }
+    
+    void CheckUIState()
+    {
+        Debug.Log("[QuickHintDetailFix] === UI State Check ===");
+        
+        // Canvas確認
+        Canvas[] canvases = FindObjectsOfType<Canvas>();
+        Debug.Log($"Canvases found: {canvases.Length}");
+        foreach (Canvas canvas in canvases)
+        {
+            Debug.Log($"Canvas: {canvas.name}, Enabled: {canvas.enabled}, RenderMode: {canvas.renderMode}");
+        }
+        
+        // EventSystem確認
+        EventSystem eventSystem = FindObjectOfType<EventSystem>();
+        Debug.Log($"EventSystem: {(eventSystem != null ? eventSystem.name : "Not found")}");
+        
+        // RealHintSystemの状態確認
+        if (realHintSystem != null)
+        {
+            // プライベートフィールドにアクセス
+            var mainContainerField = typeof(RealHintSystem).GetField("mainContainer", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            var hintDetailAreaField = typeof(RealHintSystem).GetField("hintDetailArea", 
+                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            
+            if (mainContainerField != null && hintDetailAreaField != null)
+            {
+                GameObject mainContainer = (GameObject)mainContainerField.GetValue(realHintSystem);
+                GameObject hintDetailArea = (GameObject)hintDetailAreaField.GetValue(realHintSystem);
+                
+                Debug.Log($"MainContainer: {(mainContainer != null ? mainContainer.name : "null")}");
+                Debug.Log($"HintDetailArea: {(hintDetailArea != null ? hintDetailArea.name : "null")}");
+                
+                if (hintDetailArea != null)
+                {
+                    Debug.Log($"HintDetailArea Active: {hintDetailArea.activeInHierarchy}");
+                    Debug.Log($"HintDetailArea Children: {hintDetailArea.transform.childCount}");
+                    
+                    for (int i = 0; i < hintDetailArea.transform.childCount; i++)
+                    {
+                        Transform child = hintDetailArea.transform.GetChild(i);
+                        Debug.Log($"Child {i}: {child.name} (Active: {child.gameObject.activeInHierarchy})");
+                        
+                        Text text = child.GetComponent<Text>();
+                        if (text != null)
+                        {
+                            Debug.Log($"  Text: '{text.text}' Color: {text.color} Font: {text.font?.name}");
+                        }
+                    }
+                }
+            }
+        }
+        
+        Debug.Log("[QuickHintDetailFix] === End UI State Check ===");
+    }
+    
+    void TestFontSystem()
+    {
+        Debug.Log("[QuickHintDetailFix] Testing font system...");
+        
+        Font defaultFont = UIUtility.GetDefaultFont();
+        if (defaultFont != null)
+        {
+            Debug.Log($"Default font obtained: {defaultFont.name}");
+            
+            // テストテキストを作成
+            GameObject testObj = new GameObject("FontTest");
+            Text testText = testObj.AddComponent<Text>();
+            testText.text = "フォントテスト - Font Test";
+            testText.font = defaultFont;
+            testText.fontSize = 20;
+            testText.color = Color.red;
+            
+            // Canvas上に配置
+            Canvas canvas = FindObjectOfType<Canvas>();
+            if (canvas == null)
+            {
+                GameObject canvasObj = new GameObject("TestCanvas");
+                canvas = canvasObj.AddComponent<Canvas>();
+                canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+                canvasObj.AddComponent<CanvasScaler>();
+                canvasObj.AddComponent<GraphicRaycaster>();
+            }
+            
+            testObj.transform.SetParent(canvas.transform, false);
+            RectTransform rect = testObj.GetComponent<RectTransform>();
+            rect.anchoredPosition = new Vector2(0, 200);
+            rect.sizeDelta = new Vector2(300, 50);
+            
+            Debug.Log("Font test text created on screen");
+            
+            // 5秒後に削除
+            Destroy(testObj, 5f);
+        }
+        else
+        {
+            Debug.LogError("Failed to get default font!");
+        }
+    }
+    
+    void OnGUI()
+    {
+        GUILayout.BeginArea(new Rect(10, 10, 300, 150));
+        GUILayout.Label("Quick Hint Detail Fix");
+        if (GUILayout.Button("F2: Test Hint Detail"))
+        {
+            TestHintDetailDirectly();
+        }
+        if (GUILayout.Button("F3: Check UI State"))
+        {
+            CheckUIState();
+        }
+        if (GUILayout.Button("F4: Test Font System"))
+        {
+            TestFontSystem();
+        }
+        GUILayout.EndArea();
+    }
+}

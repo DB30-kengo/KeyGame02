@@ -1,0 +1,295 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using System.Collections.Generic;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
+/// <summary>
+/// ヒントシステムの実装を確認し、問題があれば自動修正するツール
+/// </summary>
+public class HintSystemValidator : MonoBehaviour
+{
+    [Header("Validation Settings")]
+    [Tooltip("詳細なログを出力するか")]
+    public bool verboseLogging = true;
+    
+    void Start()
+    {
+        if (verboseLogging)
+        {
+            Debug.Log("[HintSystemValidator] ヒントシステムの検証を開始します");
+        }
+        
+        ValidateHintSystem();
+    }
+    
+    /// <summary>
+    /// ヒントシステム全体を検証
+    /// </summary>
+    [ContextMenu("Validate Hint System")]
+    public void ValidateHintSystem()
+    {
+        List<string> issues = new List<string>();
+        List<string> fixes = new List<string>();
+        
+        // 1. RealHintSystemの存在確認
+        ValidateRealHintSystem(issues, fixes);
+        
+        // 2. HintSystemLauncherの存在確認  
+        ValidateHintSystemLauncher(issues, fixes);
+        
+        // 3. HintSceneAutoSetupの確認
+        ValidateHintSceneAutoSetup(issues, fixes);
+        
+        // 4. シーン設定の確認
+        ValidateSceneSetup(issues, fixes);
+        
+        // 5. UIUtilityの確認
+        ValidateUIUtility(issues, fixes);
+        
+        // 結果表示
+        ShowValidationResults(issues, fixes);
+    }
+    
+    private void ValidateRealHintSystem(List<string> issues, List<string> fixes)
+    {
+        RealHintSystem realHintSystem = FindObjectOfType<RealHintSystem>();
+        
+        if (realHintSystem == null)
+        {
+            issues.Add("RealHintSystemが見つかりません");
+            
+            // 現在のシーンがHintSceneかチェック
+            if (SceneManager.GetActiveScene().name == "HintScene")
+            {
+                CreateRealHintSystem();
+                fixes.Add("RealHintSystemを自動作成しました");
+            }
+            else
+            {
+                fixes.Add("HintSceneでRealHintSystemを作成してください");
+            }
+        }
+        else
+        {
+            fixes.Add("✓ RealHintSystemが正常に存在します");
+            
+            // 設定確認
+            if (string.IsNullOrEmpty(realHintSystem.returnSceneName))
+            {
+                realHintSystem.returnSceneName = "Chapter_game";
+                fixes.Add("returnSceneNameを設定しました");
+            }
+        }
+    }
+    
+    private void ValidateHintSystemLauncher(List<string> issues, List<string> fixes)
+    {
+        HintSystemLauncher launcher = FindObjectOfType<HintSystemLauncher>();
+        
+        if (launcher == null)
+        {
+            // 現在のシーンがメインゲームシーンかチェック
+            string currentScene = SceneManager.GetActiveScene().name;
+            if (currentScene.Contains("Chapter") || currentScene.Contains("game"))
+            {
+                CreateHintSystemLauncher();
+                fixes.Add("HintSystemLauncherを自動作成しました");
+            }
+            else
+            {
+                issues.Add("HintSystemLauncherが見つかりません（メインゲームシーンで必要）");
+            }
+        }
+        else
+        {
+            fixes.Add("✓ HintSystemLauncherが正常に存在します");
+            
+            // 設定確認
+            if (string.IsNullOrEmpty(launcher.hintSceneName))
+            {
+                launcher.hintSceneName = "HintScene";
+                fixes.Add("hintSceneNameを設定しました");
+            }
+        }
+    }
+    
+    private void ValidateHintSceneAutoSetup(List<string> issues, List<string> fixes)
+    {
+        HintSceneAutoSetup autoSetup = FindObjectOfType<HintSceneAutoSetup>();
+        
+        if (SceneManager.GetActiveScene().name == "HintScene" && autoSetup == null)
+        {
+            CreateHintSceneAutoSetup();
+            fixes.Add("HintSceneAutoSetupを自動作成しました");
+        }
+        else if (autoSetup != null)
+        {
+            fixes.Add("✓ HintSceneAutoSetupが正常に存在します");
+        }
+    }
+    
+    private void ValidateSceneSetup(List<string> issues, List<string> fixes)
+    {
+        // Canvas確認
+        Canvas canvas = FindObjectOfType<Canvas>();
+        if (canvas == null)
+        {
+            CreateCanvas();
+            fixes.Add("Canvasを自動作成しました");
+        }
+        else
+        {
+            fixes.Add("✓ Canvasが存在します");
+        }
+        
+        // EventSystem確認
+        UnityEngine.EventSystems.EventSystem eventSystem = FindObjectOfType<UnityEngine.EventSystems.EventSystem>();
+        if (eventSystem == null)
+        {
+            CreateEventSystem();
+            fixes.Add("EventSystemを自動作成しました");
+        }
+        else
+        {
+            fixes.Add("✓ EventSystemが存在します");
+        }
+        
+        // Camera確認
+        Camera mainCamera = Camera.main;
+        if (mainCamera == null)
+        {
+            CreateMainCamera();
+            fixes.Add("Main Cameraを自動作成しました");
+        }
+        else
+        {
+            fixes.Add("✓ Main Cameraが存在します");
+        }
+    }
+    
+    private void ValidateUIUtility(List<string> issues, List<string> fixes)
+    {
+        // UIUtility.GetDefaultFont()をテスト
+        try
+        {
+            Font testFont = UIUtility.GetDefaultFont();
+            if (testFont != null)
+            {
+                fixes.Add("✓ UIUtility.GetDefaultFont()が正常に動作します");
+            }
+            else
+            {
+                issues.Add("UIUtility.GetDefaultFont()がnullを返しました");
+            }
+        }
+        catch (System.Exception e)
+        {
+            issues.Add($"UIUtility.GetDefaultFont()でエラー: {e.Message}");
+        }
+    }
+    
+    private void ShowValidationResults(List<string> issues, List<string> fixes)
+    {
+        Debug.Log("=== ヒントシステム検証結果 ===");
+        
+        if (issues.Count > 0)
+        {
+            Debug.LogWarning($"問題が {issues.Count} 件見つかりました:");
+            foreach (string issue in issues)
+            {
+                Debug.LogWarning($"⚠️ {issue}");
+            }
+        }
+        
+        if (fixes.Count > 0)
+        {
+            Debug.Log($"修正/確認が {fixes.Count} 件実行されました:");
+            foreach (string fix in fixes)
+            {
+                Debug.Log($"✅ {fix}");
+            }
+        }
+        
+        if (issues.Count == 0)
+        {
+            Debug.Log("🎉 ヒントシステムは正常に設定されています！");
+        }
+    }
+    
+    // 自動修正関数群
+    private void CreateRealHintSystem()
+    {
+        GameObject obj = new GameObject("RealHintSystem");
+        RealHintSystem system = obj.AddComponent<RealHintSystem>();
+        system.returnSceneName = PlayerPrefs.GetString("PreviousScene", "Chapter_game");
+    }
+    
+    private void CreateHintSystemLauncher()
+    {
+        GameObject obj = new GameObject("HintSystemLauncher");
+        HintSystemLauncher launcher = obj.AddComponent<HintSystemLauncher>();
+        launcher.hintSceneName = "HintScene";
+    }
+    
+    private void CreateHintSceneAutoSetup()
+    {
+        GameObject obj = new GameObject("HintSceneAutoSetup");
+        HintSceneAutoSetup setup = obj.AddComponent<HintSceneAutoSetup>();
+        setup.mainGameSceneName = "Chapter_game";
+    }
+    
+    private void CreateCanvas()
+    {
+        GameObject canvasObj = new GameObject("Canvas");
+        Canvas canvas = canvasObj.AddComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvasObj.AddComponent<CanvasScaler>();
+        canvasObj.AddComponent<GraphicRaycaster>();
+    }
+    
+    private void CreateEventSystem()
+    {
+        GameObject eventObj = new GameObject("EventSystem");
+        eventObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
+        eventObj.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+    }
+    
+    private void CreateMainCamera()
+    {
+        GameObject cameraObj = new GameObject("Main Camera");
+        Camera camera = cameraObj.AddComponent<Camera>();
+        cameraObj.tag = "MainCamera";
+        camera.clearFlags = CameraClearFlags.SolidColor;
+        camera.backgroundColor = new Color(0.05f, 0.1f, 0.2f, 1f);
+    }
+    
+    /// <summary>
+    /// 手動で全システムをセットアップ
+    /// </summary>
+    [ContextMenu("Auto Setup All Systems")]
+    public void AutoSetupAllSystems()
+    {
+        Debug.Log("[HintSystemValidator] 全システムの自動セットアップを開始");
+        
+        CreateCanvas();
+        CreateEventSystem();
+        CreateMainCamera();
+        
+        string currentScene = SceneManager.GetActiveScene().name;
+        
+        if (currentScene == "HintScene")
+        {
+            CreateRealHintSystem();
+            CreateHintSceneAutoSetup();
+        }
+        else if (currentScene.Contains("Chapter") || currentScene.Contains("game"))
+        {
+            CreateHintSystemLauncher();
+        }
+        
+        Debug.Log("[HintSystemValidator] 全システムの自動セットアップ完了");
+    }
+}

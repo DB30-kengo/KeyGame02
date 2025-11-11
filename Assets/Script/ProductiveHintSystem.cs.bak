@@ -1,0 +1,836 @@
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
+/// <summary>
+/// 実用的なヒントシステム - 本格的なヒント表示とシーン遷移を実装
+/// </summary>
+public class ProductiveHintSystem : MonoBehaviour
+{
+    [Header("UI References")]
+    public Canvas mainCanvas;
+    public GameHintManager hintManager;
+    
+    [Header("Scene Management")]
+    [Tooltip("メインゲームシーン名")]
+    public string mainGameSceneName = "Chapter_game";
+    
+    [Tooltip("メインメニューシーン名")]
+    public string mainMenuSceneName = "MainMenu";
+    
+    [Header("UI Layout Settings")]
+    [Tooltip("カテゴリボタンのサイズ")]
+    public Vector2 categoryButtonSize = new Vector2(300, 60);
+    
+    [Tooltip("ヒント詳細パネルのサイズ")]
+    public Vector2 hintPanelSize = new Vector2(800, 600);
+    
+    void Start()
+    {
+        // カーソルをUI用に設定
+        SetupCursorForUI();
+        
+        // メインUIを構築
+        BuildProductiveHintUI();
+        
+        // GameHintManagerとの連携
+        IntegrateWithHintManager();
+    }
+    
+    /// <summary>
+    /// カーソルをUI用に設定
+    /// </summary>
+    private void SetupCursorForUI()
+    {
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+        Debug.Log("[ProductiveHintSystem] カーソルをUI用に設定しました");
+    }
+    
+    /// <summary>
+    /// 実用的なヒントUIを構築
+    /// </summary>
+    private void BuildProductiveHintUI()
+    {
+        Debug.Log("[ProductiveHintSystem] 実用的なヒントUIを構築中...");
+        
+        // メインCanvasを確保
+        EnsureMainCanvas();
+        
+        // メインコンテナを作成
+        CreateMainContainer();
+        
+        // ヘッダーを作成
+        CreateHeader();
+        
+        // カテゴリ選択エリアを作成
+        CreateCategoryArea();
+        
+        // ヒント表示エリアを作成
+        CreateHintDisplayArea();
+        
+        // ナビゲーションエリアを作成
+        CreateNavigationArea();
+        
+        Debug.Log("[ProductiveHintSystem] ヒントUI構築完了");
+    }
+    
+    /// <summary>
+    /// メインCanvasを確保
+    /// </summary>
+    private void EnsureMainCanvas()
+    {
+        if (mainCanvas == null)
+        {
+            mainCanvas = FindObjectOfType<Canvas>();
+        }
+        
+        if (mainCanvas == null)
+        {
+            GameObject canvasObj = new GameObject("MainCanvas");
+            mainCanvas = canvasObj.AddComponent<Canvas>();
+            mainCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            canvasObj.AddComponent<CanvasScaler>();
+            canvasObj.AddComponent<GraphicRaycaster>();
+        }
+        
+        // EventSystemを確保
+        if (FindObjectOfType<UnityEngine.EventSystems.EventSystem>() == null)
+        {
+            GameObject eventObj = new GameObject("EventSystem");
+            eventObj.AddComponent<UnityEngine.EventSystems.EventSystem>();
+            eventObj.AddComponent<UnityEngine.EventSystems.StandaloneInputModule>();
+        }
+    }
+    
+    /// <summary>
+    /// メインコンテナを作成
+    /// </summary>
+    private void CreateMainContainer()
+    {
+        GameObject container = new GameObject("HintSystemContainer");
+        container.transform.SetParent(mainCanvas.transform, false);
+        
+        RectTransform rect = container.AddComponent<RectTransform>();
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // 背景画像
+        Image background = container.AddComponent<Image>();
+        background.color = new Color(0.05f, 0.05f, 0.15f, 0.95f); // 濃紺系
+        background.sprite = null; // ソリッドカラー
+    }
+    
+    /// <summary>
+    /// ヘッダーを作成
+    /// </summary>
+    private void CreateHeader()
+    {
+        GameObject header = new GameObject("Header");
+        header.transform.SetParent(mainCanvas.transform, false);
+        
+        RectTransform rect = header.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.9f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // ヘッダー背景
+        Image headerBg = header.AddComponent<Image>();
+        headerBg.color = new Color(0.1f, 0.3f, 0.6f, 0.9f);
+        
+        // タイトルテキスト
+        GameObject titleObj = new GameObject("Title");
+        titleObj.transform.SetParent(header.transform, false);
+        
+        Text titleText = titleObj.AddComponent<Text>();
+        titleText.text = "🔐 暗号学習ヒントシステム";
+        titleText.font = UIUtility.GetDefaultFont();
+        titleText.fontSize = 24;
+        titleText.alignment = TextAnchor.MiddleCenter;
+        titleText.color = Color.white;
+        titleText.fontStyle = FontStyle.Bold;
+        
+        RectTransform titleRect = titleObj.GetComponent<RectTransform>();
+        titleRect.anchorMin = Vector2.zero;
+        titleRect.anchorMax = Vector2.one;
+        titleRect.offsetMin = Vector2.zero;
+        titleRect.offsetMax = Vector2.zero;
+    }
+    
+    /// <summary>
+    /// カテゴリ選択エリアを作成
+    /// </summary>
+    private void CreateCategoryArea()
+    {
+        GameObject categoryArea = new GameObject("CategoryArea");
+        categoryArea.transform.SetParent(mainCanvas.transform, false);
+        
+        RectTransform rect = categoryArea.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.3f);
+        rect.anchorMax = new Vector2(1f, 0.9f);
+        rect.offsetMin = new Vector2(50, 0);
+        rect.offsetMax = new Vector2(-50, 0);
+        
+        // カテゴリボタンを作成
+        CreateCategoryButtons(categoryArea);
+    }
+    
+    /// <summary>
+    /// カテゴリボタンを作成
+    /// </summary>
+    private void CreateCategoryButtons(GameObject parent)
+    {
+        string[] categories = {
+            "🔑 共通鍵暗号方式",
+            "🗝️ 公開鍵暗号方式", 
+            "🔐 ハイブリッド暗号方式",
+            "🎮 ゲーム操作",
+            "💡 一般ヒント"
+        };
+        
+        Color[] categoryColors = {
+            new Color(0.2f, 0.8f, 0.2f, 0.9f), // 緑 - 共通鍵
+            new Color(0.8f, 0.4f, 0.1f, 0.9f), // オレンジ - 公開鍵
+            new Color(0.6f, 0.2f, 0.8f, 0.9f), // 紫 - ハイブリッド
+            new Color(0.2f, 0.6f, 0.8f, 0.9f), // 青 - ゲーム操作
+            new Color(0.8f, 0.8f, 0.2f, 0.9f)  // 黄 - 一般
+        };
+        
+        for (int i = 0; i < categories.Length; i++)
+        {
+            GameObject buttonObj = CreateCategoryButton(
+                parent, 
+                categories[i], 
+                categoryColors[i], 
+                i
+            );
+            
+            // ボタン配置
+            RectTransform buttonRect = buttonObj.GetComponent<RectTransform>();
+            float yPos = 0.8f - (i * 0.15f);
+            buttonRect.anchorMin = new Vector2(0.1f, yPos);
+            buttonRect.anchorMax = new Vector2(0.9f, yPos + 0.12f);
+            buttonRect.offsetMin = Vector2.zero;
+            buttonRect.offsetMax = Vector2.zero;
+        }
+    }
+    
+    /// <summary>
+    /// 個別カテゴリボタンを作成
+    /// </summary>
+    private GameObject CreateCategoryButton(GameObject parent, string text, Color color, int categoryIndex)
+    {
+        GameObject buttonObj = new GameObject($"CategoryButton_{categoryIndex}");
+        buttonObj.transform.SetParent(parent.transform, false);
+        
+        // ボタンコンポーネント
+        Image image = buttonObj.AddComponent<Image>();
+        image.color = color;
+        
+        Button button = buttonObj.AddComponent<Button>();
+        
+        // ホバー効果
+        ColorBlock colors = ColorBlock.defaultColorBlock;
+        colors.normalColor = color;
+        colors.highlightedColor = Color.Lerp(color, Color.white, 0.2f);
+        colors.pressedColor = Color.Lerp(color, Color.black, 0.2f);
+        button.colors = colors;
+        
+        // クリックイベント
+        button.onClick.AddListener(() => {
+            OnCategoryButtonClicked(categoryIndex, text);
+        });
+        
+        // ボタンテキスト
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(buttonObj.transform, false);
+        
+        Text buttonText = textObj.AddComponent<Text>();
+        buttonText.text = text;
+        buttonText.font = UIUtility.GetDefaultFont();
+        buttonText.fontSize = 18;
+        buttonText.alignment = TextAnchor.MiddleCenter;
+        buttonText.color = Color.white;
+        buttonText.fontStyle = FontStyle.Bold;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(20, 0);
+        textRect.offsetMax = new Vector2(-20, 0);
+        
+        return buttonObj;
+    }
+    
+    /// <summary>
+    /// カテゴリボタンクリック処理
+    /// </summary>
+    private void OnCategoryButtonClicked(int categoryIndex, string categoryName)
+    {
+        Debug.Log($"[ProductiveHintSystem] カテゴリ選択: {categoryName}");
+        
+        // GameHintManagerでカテゴリ選択を実行
+        if (hintManager != null)
+        {
+            GameHintManager.HintCategory category = (GameHintManager.HintCategory)(categoryIndex + 1);
+            hintManager.SelectCategory(category);
+            
+            // カテゴリエリアを非表示にしてヒント選択エリアを表示
+            ShowHintSelectionArea(category, categoryName);
+        }
+        else
+        {
+            Debug.LogError("[ProductiveHintSystem] GameHintManager が見つかりません");
+        }
+    }
+    
+    /// <summary>
+    /// ヒント選択エリアを表示
+    /// </summary>
+    private void ShowHintSelectionArea(GameHintManager.HintCategory category, string categoryName)
+    {
+        // カテゴリエリアを非表示
+        GameObject categoryArea = GameObject.Find("CategoryArea");
+        if (categoryArea != null)
+        {
+            categoryArea.SetActive(false);
+        }
+        
+        // ヒント選択エリアを作成・表示
+        CreateHintSelectionArea(category, categoryName);
+    }
+    
+    /// <summary>
+    /// ヒント選択エリアを作成
+    /// </summary>
+    private void CreateHintSelectionArea(GameHintManager.HintCategory category, string categoryName)
+    {
+        // 既存のヒント選択エリアがあれば削除
+        GameObject existingArea = GameObject.Find("HintSelectionArea");
+        if (existingArea != null)
+        {
+            DestroyImmediate(existingArea);
+        }
+        
+        GameObject selectionArea = new GameObject("HintSelectionArea");
+        selectionArea.transform.SetParent(mainCanvas.transform, false);
+        
+        RectTransform rect = selectionArea.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.2f);
+        rect.anchorMax = new Vector2(1f, 0.9f);
+        rect.offsetMin = new Vector2(50, 0);
+        rect.offsetMax = new Vector2(-50, 0);
+        
+        // カテゴリタイトル
+        CreateCategoryTitle(selectionArea, categoryName);
+        
+        // ヒントボタンリスト
+        CreateHintButtonList(selectionArea, category);
+    }
+    
+    /// <summary>
+    /// カテゴリタイトルを作成
+    /// </summary>
+    private void CreateCategoryTitle(GameObject parent, string categoryName)
+    {
+        GameObject titleObj = new GameObject("CategoryTitle");
+        titleObj.transform.SetParent(parent.transform, false);
+        
+        RectTransform rect = titleObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.85f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        Text titleText = titleObj.AddComponent<Text>();
+        titleText.text = $"📚 {categoryName} - ヒント一覧";
+        titleText.font = UIUtility.GetDefaultFont();
+        titleText.fontSize = 20;
+        titleText.alignment = TextAnchor.MiddleCenter;
+        titleText.color = Color.white;
+        titleText.fontStyle = FontStyle.Bold;
+    }
+    
+    /// <summary>
+    /// ヒントボタンリストを作成
+    /// </summary>
+    private void CreateHintButtonList(GameObject parent, GameHintManager.HintCategory category)
+    {
+        // GameHintManagerからヒントデータを取得
+        if (hintManager == null) return;
+        
+        var hintsField = typeof(GameHintManager).GetField("hintDatabase", 
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+        
+        if (hintsField != null)
+        {
+            var hintDatabase = hintsField.GetValue(hintManager) as System.Collections.Generic.Dictionary<GameHintManager.HintCategory, System.Collections.Generic.List<GameHintManager.HintData>>;
+            
+            if (hintDatabase != null && hintDatabase.ContainsKey(category))
+            {
+                var hints = hintDatabase[category];
+                
+                for (int i = 0; i < hints.Count; i++)
+                {
+                    CreateHintButton(parent, hints[i], i, category);
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 個別ヒントボタンを作成
+    /// </summary>
+    private void CreateHintButton(GameObject parent, GameHintManager.HintData hintData, int index, GameHintManager.HintCategory category)
+    {
+        GameObject buttonObj = new GameObject($"HintButton_{index}");
+        buttonObj.transform.SetParent(parent.transform, false);
+        
+        RectTransform rect = buttonObj.AddComponent<RectTransform>();
+        float yPos = 0.75f - (index * 0.12f);
+        rect.anchorMin = new Vector2(0.05f, yPos);
+        rect.anchorMax = new Vector2(0.95f, yPos + 0.1f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // ボタン設定
+        Image image = buttonObj.AddComponent<Image>();
+        image.color = new Color(0.3f, 0.3f, 0.5f, 0.8f);
+        
+        Button button = buttonObj.AddComponent<Button>();
+        button.onClick.AddListener(() => {
+            OnHintButtonClicked(hintData, category);
+        });
+        
+        // ボタンテキスト
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(buttonObj.transform, false);
+        
+        Text buttonText = textObj.AddComponent<Text>();
+        buttonText.text = $"{index + 1}. {hintData.title}";
+        buttonText.font = UIUtility.GetDefaultFont();
+        buttonText.fontSize = 16;
+        buttonText.alignment = TextAnchor.MiddleLeft;
+        buttonText.color = Color.white;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(20, 0);
+        textRect.offsetMax = new Vector2(-20, 0);
+    }
+    
+    /// <summary>
+    /// ヒントボタンクリック処理
+    /// </summary>
+    private void OnHintButtonClicked(GameHintManager.HintData hintData, GameHintManager.HintCategory category)
+    {
+        Debug.Log($"[ProductiveHintSystem] ヒント選択: {hintData.title}");
+        
+        // ヒント詳細表示エリアを作成
+        ShowHintDetailArea(hintData, category);
+    }
+    
+    /// <summary>
+    /// ヒント詳細エリアを表示
+    /// </summary>
+    private void ShowHintDetailArea(GameHintManager.HintData hintData, GameHintManager.HintCategory category)
+    {
+        // 既存の表示エリアを非表示
+        GameObject selectionArea = GameObject.Find("HintSelectionArea");
+        if (selectionArea != null)
+        {
+            selectionArea.SetActive(false);
+        }
+        
+        CreateHintDetailArea(hintData, category);
+    }
+    
+    /// <summary>
+    /// ヒント詳細エリアを作成
+    /// </summary>
+    private void CreateHintDetailArea(GameHintManager.HintData hintData, GameHintManager.HintCategory category)
+    {
+        // 既存の詳細エリアがあれば削除
+        GameObject existingDetail = GameObject.Find("HintDetailArea");
+        if (existingDetail != null)
+        {
+            DestroyImmediate(existingDetail);
+        }
+        
+        GameObject detailArea = new GameObject("HintDetailArea");
+        detailArea.transform.SetParent(mainCanvas.transform, false);
+        
+        RectTransform rect = detailArea.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.1f, 0.2f);
+        rect.anchorMax = new Vector2(0.9f, 0.9f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // 背景
+        Image background = detailArea.AddComponent<Image>();
+        background.color = new Color(0.1f, 0.1f, 0.2f, 0.95f);
+        
+        // タイトル
+        CreateDetailTitle(detailArea, hintData.title);
+        
+        // 内容
+        CreateDetailContent(detailArea, hintData.content);
+        
+        // 戻るボタン
+        CreateDetailBackButton(detailArea, category);
+    }
+    
+    /// <summary>
+    /// 詳細タイトルを作成
+    /// </summary>
+    private void CreateDetailTitle(GameObject parent, string title)
+    {
+        GameObject titleObj = new GameObject("DetailTitle");
+        titleObj.transform.SetParent(parent.transform, false);
+        
+        RectTransform rect = titleObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.85f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.offsetMin = new Vector2(20, 0);
+        rect.offsetMax = new Vector2(-20, 0);
+        
+        Text titleText = titleObj.AddComponent<Text>();
+        titleText.text = $"📖 {title}";
+        titleText.font = UIUtility.GetDefaultFont();
+        titleText.fontSize = 22;
+        titleText.alignment = TextAnchor.MiddleCenter;
+        titleText.color = Color.white;
+        titleText.fontStyle = FontStyle.Bold;
+    }
+    
+    /// <summary>
+    /// 詳細内容を作成
+    /// </summary>
+    private void CreateDetailContent(GameObject parent, string content)
+    {
+        GameObject contentObj = new GameObject("DetailContent");
+        contentObj.transform.SetParent(parent.transform, false);
+        
+        RectTransform rect = contentObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0.15f);
+        rect.anchorMax = new Vector2(1f, 0.85f);
+        rect.offsetMin = new Vector2(30, 0);
+        rect.offsetMax = new Vector2(-30, 0);
+        
+        // スクロールビューを作成（長いテキスト対応）
+        GameObject scrollView = new GameObject("ScrollView");
+        scrollView.transform.SetParent(contentObj.transform, false);
+        
+        RectTransform scrollRect = scrollView.AddComponent<RectTransform>();
+        scrollRect.anchorMin = Vector2.zero;
+        scrollRect.anchorMax = Vector2.one;
+        scrollRect.offsetMin = Vector2.zero;
+        scrollRect.offsetMax = Vector2.zero;
+        
+        ScrollRect scroll = scrollView.AddComponent<ScrollRect>();
+        Image scrollBg = scrollView.AddComponent<Image>();
+        scrollBg.color = new Color(0.05f, 0.05f, 0.1f, 0.8f);
+        
+        // コンテンツエリア
+        GameObject scrollContent = new GameObject("Content");
+        scrollContent.transform.SetParent(scrollView.transform, false);
+        
+        RectTransform contentRect = scrollContent.AddComponent<RectTransform>();
+        contentRect.anchorMin = new Vector2(0f, 0f);
+        contentRect.anchorMax = new Vector2(1f, 1f);
+        contentRect.offsetMin = Vector2.zero;
+        contentRect.offsetMax = Vector2.zero;
+        
+        scroll.content = contentRect;
+        scroll.horizontal = false;
+        scroll.vertical = true;
+        
+        // テキスト
+        Text contentText = scrollContent.AddComponent<Text>();
+        contentText.text = content;
+        contentText.font = UIUtility.GetDefaultFont();
+        contentText.fontSize = 16;
+        contentText.alignment = TextAnchor.UpperLeft;
+        contentText.color = Color.white;
+        contentText.lineSpacing = 1.2f;
+        
+        // テキストサイズ自動調整
+        ContentSizeFitter sizeFitter = scrollContent.AddComponent<ContentSizeFitter>();
+        sizeFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+    }
+    
+    /// <summary>
+    /// 詳細画面の戻るボタンを作成
+    /// </summary>
+    private void CreateDetailBackButton(GameObject parent, GameHintManager.HintCategory category)
+    {
+        GameObject backButtonObj = new GameObject("DetailBackButton");
+        backButtonObj.transform.SetParent(parent.transform, false);
+        
+        RectTransform rect = backButtonObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(0.3f, 0.12f);
+        rect.offsetMin = new Vector2(20, 20);
+        rect.offsetMax = new Vector2(-20, -20);
+        
+        Image image = backButtonObj.AddComponent<Image>();
+        image.color = new Color(0.6f, 0.3f, 0.1f, 0.9f);
+        
+        Button button = backButtonObj.AddComponent<Button>();
+        button.onClick.AddListener(() => {
+            OnDetailBackButtonClicked(category);
+        });
+        
+        // ボタンテキスト
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(backButtonObj.transform, false);
+        
+        Text buttonText = textObj.AddComponent<Text>();
+        buttonText.text = "← 戻る";
+        buttonText.font = UIUtility.GetDefaultFont();
+        buttonText.fontSize = 16;
+        buttonText.alignment = TextAnchor.MiddleCenter;
+        buttonText.color = Color.white;
+        buttonText.fontStyle = FontStyle.Bold;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+    }
+    
+    /// <summary>
+    /// 詳細画面の戻るボタンクリック処理
+    /// </summary>
+    private void OnDetailBackButtonClicked(GameHintManager.HintCategory category)
+    {
+        Debug.Log("[ProductiveHintSystem] 詳細画面から戻る");
+        
+        // 詳細エリアを削除
+        GameObject detailArea = GameObject.Find("HintDetailArea");
+        if (detailArea != null)
+        {
+            DestroyImmediate(detailArea);
+        }
+        
+        // ヒント選択エリアを再表示
+        GameObject selectionArea = GameObject.Find("HintSelectionArea");
+        if (selectionArea != null)
+        {
+            selectionArea.SetActive(true);
+        }
+    }
+    
+    /// <summary>
+    /// ヒント表示エリアを作成
+    /// </summary>
+    private void CreateHintDisplayArea()
+    {
+        // 上記の動的生成で処理されるため、ここでは空実装
+    }
+    
+    /// <summary>
+    /// ナビゲーションエリアを作成
+    /// </summary>
+    private void CreateNavigationArea()
+    {
+        GameObject navArea = new GameObject("NavigationArea");
+        navArea.transform.SetParent(mainCanvas.transform, false);
+        
+        RectTransform rect = navArea.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 0.2f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        // 戻るボタン
+        CreateMainBackButton(navArea);
+        
+        // メインメニューボタン
+        CreateMainMenuButton(navArea);
+    }
+    
+    /// <summary>
+    /// メイン戻るボタンを作成
+    /// </summary>
+    private void CreateMainBackButton(GameObject parent)
+    {
+        GameObject backButtonObj = new GameObject("MainBackButton");
+        backButtonObj.transform.SetParent(parent.transform, false);
+        
+        RectTransform rect = backButtonObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.05f, 0.2f);
+        rect.anchorMax = new Vector2(0.3f, 0.8f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        Image image = backButtonObj.AddComponent<Image>();
+        image.color = new Color(0.8f, 0.4f, 0.1f, 0.9f);
+        
+        Button button = backButtonObj.AddComponent<Button>();
+        button.onClick.AddListener(() => {
+            OnMainBackButtonClicked();
+        });
+        
+        // ボタンテキスト
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(backButtonObj.transform, false);
+        
+        Text buttonText = textObj.AddComponent<Text>();
+        buttonText.text = "🔙 ゲームに戻る";
+        buttonText.font = UIUtility.GetDefaultFont();
+        buttonText.fontSize = 16;
+        buttonText.alignment = TextAnchor.MiddleCenter;
+        buttonText.color = Color.white;
+        buttonText.fontStyle = FontStyle.Bold;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+    }
+    
+    /// <summary>
+    /// メインメニューボタンを作成
+    /// </summary>
+    private void CreateMainMenuButton(GameObject parent)
+    {
+        GameObject menuButtonObj = new GameObject("MainMenuButton");
+        menuButtonObj.transform.SetParent(parent.transform, false);
+        
+        RectTransform rect = menuButtonObj.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.7f, 0.2f);
+        rect.anchorMax = new Vector2(0.95f, 0.8f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        
+        Image image = menuButtonObj.AddComponent<Image>();
+        image.color = new Color(0.2f, 0.6f, 0.8f, 0.9f);
+        
+        Button button = menuButtonObj.AddComponent<Button>();
+        button.onClick.AddListener(() => {
+            OnMainMenuButtonClicked();
+        });
+        
+        // ボタンテキスト
+        GameObject textObj = new GameObject("Text");
+        textObj.transform.SetParent(menuButtonObj.transform, false);
+        
+        Text buttonText = textObj.AddComponent<Text>();
+        buttonText.text = "🏠 メインメニュー";
+        buttonText.font = UIUtility.GetDefaultFont();
+        buttonText.fontSize = 16;
+        buttonText.alignment = TextAnchor.MiddleCenter;
+        buttonText.color = Color.white;
+        buttonText.fontStyle = FontStyle.Bold;
+        
+        RectTransform textRect = textObj.GetComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+    }
+    
+    /// <summary>
+    /// メイン戻るボタンクリック処理
+    /// </summary>
+    private void OnMainBackButtonClicked()
+    {
+        Debug.Log("[ProductiveHintSystem] メインゲームに戻る");
+        
+        // カーソル状態を復元
+        HintSceneTransition.RestoreCursorState();
+        
+        // メインゲームシーンに戻る
+        if (Application.CanStreamedLevelBeLoaded(mainGameSceneName))
+        {
+            SceneManager.LoadScene(mainGameSceneName);
+        }
+        else
+        {
+            // PlayerPrefsから戻り先を確認
+            string returnScene = PlayerPrefs.GetString("ReturnScene", mainGameSceneName);
+            SceneManager.LoadScene(returnScene);
+        }
+    }
+    
+    /// <summary>
+    /// メインメニューボタンクリック処理
+    /// </summary>
+    private void OnMainMenuButtonClicked()
+    {
+        Debug.Log("[ProductiveHintSystem] メインメニューに移動");
+        
+        // カーソル状態を復元
+        HintSceneTransition.RestoreCursorState();
+        
+        // メインメニューシーンに移動
+        if (Application.CanStreamedLevelBeLoaded(mainMenuSceneName))
+        {
+            SceneManager.LoadScene(mainMenuSceneName);
+        }
+        else
+        {
+            Debug.LogWarning("[ProductiveHintSystem] メインメニューシーンが見つかりません。ゲームシーンに戻ります。");
+            OnMainBackButtonClicked();
+        }
+    }
+    
+    /// <summary>
+    /// GameHintManagerとの連携
+    /// </summary>
+    private void IntegrateWithHintManager()
+    {
+        if (hintManager == null)
+        {
+            hintManager = FindObjectOfType<GameHintManager>();
+        }
+        
+        if (hintManager == null)
+        {
+            // GameHintManagerが存在しない場合は作成
+            GameObject managerObj = new GameObject("GameHintManager");
+            hintManager = managerObj.AddComponent<GameHintManager>();
+            
+            Debug.Log("[ProductiveHintSystem] GameHintManagerを作成しました");
+        }
+        
+        Debug.Log("[ProductiveHintSystem] GameHintManagerとの連携が完了しました");
+    }
+    
+    /// <summary>
+    /// カテゴリ選択画面に戻る
+    /// </summary>
+    [ContextMenu("Show Category Selection")]
+    public void ShowCategorySelection()
+    {
+        // 全ての子エリアを削除
+        GameObject[] areas = {
+            GameObject.Find("HintSelectionArea"),
+            GameObject.Find("HintDetailArea")
+        };
+        
+        foreach (GameObject area in areas)
+        {
+            if (area != null)
+            {
+                DestroyImmediate(area);
+            }
+        }
+        
+        // カテゴリエリアを再表示
+        GameObject categoryArea = GameObject.Find("CategoryArea");
+        if (categoryArea != null)
+        {
+            categoryArea.SetActive(true);
+        }
+        
+        Debug.Log("[ProductiveHintSystem] カテゴリ選択画面に戻りました");
+    }
+}
