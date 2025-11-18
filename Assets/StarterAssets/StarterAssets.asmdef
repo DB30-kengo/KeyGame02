@@ -2,8 +2,7 @@
     "name": "StarterAssets",
     "rootNamespace": "",
     "references": [
-        "Unity.InputSystem",
-        "Unity.ugui"
+        "Unity.InputSystem"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

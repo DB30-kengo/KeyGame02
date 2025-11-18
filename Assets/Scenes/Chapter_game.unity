@@ -4710,8 +4710,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameSetDuration: 180
   questionsPerSet: 3
-  enableSymmetricKey: 1
-  enablePublicKey: 1
+  enableSymmetricKey: 0
+  enablePublicKey: 0
   enableHybrid: 1
   questionText: {fileID: 1633949100}
   progressText: {fileID: 900029165}

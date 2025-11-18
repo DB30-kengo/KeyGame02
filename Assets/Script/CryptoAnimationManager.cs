@@ -105,10 +105,10 @@ public class CryptoAnimationManager : MonoBehaviour
         public float arcHeight = 4f;
         
         [Tooltip("公開鍵表示位置")]
-        public Vector3 publicKeyShowPosition = new Vector3(5, 3f, 8);
+        public Vector3 publicKeyShowPosition = new Vector3(4, 5, 10);
         
         [Tooltip("秘密鍵表示位置")]
-        public Vector3 privateKeyShowPosition = new Vector3(5, 1.5f, 12);
+        public Vector3 privateKeyShowPosition = new Vector3(6, 5, 10);
         
         [Tooltip("公開鍵でのデータ暗号化位置")]
         public Vector3 publicEncryptDataPosition = new Vector3(-5, 1.5f, 10);
@@ -326,7 +326,9 @@ public class CryptoAnimationManager : MonoBehaviour
         if (publicKey != null)
         {
             publicKey.SetActive(false);
-            Debug.Log("公開鍵を非表示に設定");
+            // 公開鍵の位置を設定された表示位置に配置
+            publicKey.transform.position = animPositions.publicKeyShowPosition;
+            Debug.Log($"公開鍵を非表示に設定し、位置を {animPositions.publicKeyShowPosition} に配置");
         }
         else
         {
@@ -336,7 +338,9 @@ public class CryptoAnimationManager : MonoBehaviour
         if (privateKey != null)
         {
             privateKey.SetActive(false);
-            Debug.Log("秘密鍵を非表示に設定");
+            // 秘密鍵の位置を設定された表示位置に配置
+            privateKey.transform.position = animPositions.privateKeyShowPosition;
+            Debug.Log($"秘密鍵を非表示に設定し、位置を {animPositions.privateKeyShowPosition} に配置");
         }
         else
         {
@@ -499,6 +503,22 @@ public class CryptoAnimationManager : MonoBehaviour
             else
             {
                 Debug.Log($"{keyName}は既に表示済み - エフェクトのみ実行");
+            }
+            
+            // 鍵の種類に応じて位置を設定
+            switch (keyType.ToLower())
+            {
+                case "public":
+                case "公開鍵":
+                    keyToShow.transform.position = animPositions.publicKeyShowPosition;
+                    Debug.Log($"公開鍵を位置 {animPositions.publicKeyShowPosition} に配置");
+                    break;
+                    
+                case "private":
+                case "秘密鍵":
+                    keyToShow.transform.position = animPositions.privateKeyShowPosition;
+                    Debug.Log($"秘密鍵を位置 {animPositions.privateKeyShowPosition} に配置");
+                    break;
             }
             
             // 表示エフェクトを実行
@@ -1137,30 +1157,29 @@ public class CryptoAnimationManager : MonoBehaviour
     {
         Debug.Log("エリアBで鍵ペアを生成中...");
         
-        // エリアBの位置を取得
-        Vector3 areaBPosition = animPositions.areaBPosition;
-        
-        // 秘密鍵を生成（エリアBの少し左側）
-        Vector3 privateKeyPosition = areaBPosition + Vector3.left * 1.5f + Vector3.up * 0.5f;
-        GameObject privateKey = CreateKeyObject(privateKeyPosition, privateKeyColor, "秘密鍵");
-        
-        yield return new WaitForSeconds(1f);
-        
-        // 公開鍵を生成（エリアBの少し右側）
-        Vector3 publicKeyPosition = areaBPosition + Vector3.right * 1.5f + Vector3.up * 0.5f;
-        GameObject publicKey = CreateKeyObject(publicKeyPosition, publicKeyColor, "公開鍵");
-        
-        yield return new WaitForSeconds(1f);
-        
-        // 鍵ペア生成完了のエフェクト
-        if (keyGenerationEffect != null)
+        if (publicKey != null && privateKey != null)
         {
-            Instantiate(keyGenerationEffect, areaBPosition, Quaternion.identity);
+            // 既存のキーオブジェクトを使用して、設定された位置に配置
+            publicKey.transform.position = animPositions.publicKeyShowPosition;
+            privateKey.transform.position = animPositions.privateKeyShowPosition;
+            
+            // キーオブジェクトを表示状態にする
+            publicKey.SetActive(true);
+            privateKey.SetActive(true);
+            
+            Debug.Log($"公開鍵を位置 {animPositions.publicKeyShowPosition} に配置");
+            Debug.Log($"秘密鍵を位置 {animPositions.privateKeyShowPosition} に配置");
+            
+            // エフェクトを実行
+            StartCoroutine(GlowEffect(privateKey));
+            yield return new WaitForSeconds(0.5f);
+            StartCoroutine(GlowEffect(publicKey));
+            yield return new WaitForSeconds(1f);
         }
-        
-        // 生成された鍵を管理リストに追加
-        generatedObjects.Add(privateKey);
-        generatedObjects.Add(publicKey);
+        else
+        {
+            Debug.LogWarning("公開鍵または秘密鍵オブジェクトが見つかりません");
+        }
         
         Debug.Log("エリアBでの鍵ペア生成完了");
     }
@@ -1232,13 +1251,12 @@ public class CryptoAnimationManager : MonoBehaviour
             publicKey.SetActive(true);
             privateKey.SetActive(true);
             
-            // エリアBの位置に配置（間隔を広げて重なりを防ぐ）
-            Vector3 areaBPos = animPositions.areaBPosition;
-            Vector3 publicPos = areaBPos + Vector3.right * 2f + Vector3.up * 0.5f + Vector3.forward * 1.5f;
-            Vector3 privatePos = areaBPos + Vector3.left * 2f + Vector3.up * 0.5f + Vector3.back * 1.5f;
+            // 設定された表示位置に配置
+            publicKey.transform.position = animPositions.publicKeyShowPosition;
+            privateKey.transform.position = animPositions.privateKeyShowPosition;
             
-            publicKey.transform.position = publicPos;
-            privateKey.transform.position = privatePos;
+            Debug.Log($"公開鍵暗号：公開鍵を位置 {animPositions.publicKeyShowPosition} に配置");
+            Debug.Log($"公開鍵暗号：秘密鍵を位置 {animPositions.privateKeyShowPosition} に配置");
             
             // 鍵生成エフェクト（時間差をつけて見やすく）
             yield return StartCoroutine(GlowEffect(privateKey));
@@ -1248,7 +1266,7 @@ public class CryptoAnimationManager : MonoBehaviour
             // 鍵生成完了のエフェクト
             if (keyGenerationEffect != null)
             {
-                Instantiate(keyGenerationEffect, areaBPos, Quaternion.identity);
+                Instantiate(keyGenerationEffect, animPositions.areaBPosition, Quaternion.identity);
             }
         }
         
@@ -1415,13 +1433,12 @@ public class CryptoAnimationManager : MonoBehaviour
                 Debug.Log("セッション鍵を非表示に設定");
             }
             
-            // エリアBの位置に配置（間隔を広げて重なりを防ぐ）
-            Vector3 areaBPos = animPositions.areaBPosition;
-            Vector3 publicPos = areaBPos + Vector3.right * 2.5f + Vector3.up * 1f + Vector3.forward * 1f;
-            Vector3 privatePos = areaBPos + Vector3.left * 2.5f + Vector3.up * 1f + Vector3.back * 1f;
+            // エリアBの位置に配置（設定された表示位置を使用）
+            publicKey.transform.position = animPositions.publicKeyShowPosition;
+            privateKey.transform.position = animPositions.privateKeyShowPosition;
             
-            publicKey.transform.position = publicPos;
-            privateKey.transform.position = privatePos;
+            Debug.Log($"ハイブリッド暗号：公開鍵を位置 {animPositions.publicKeyShowPosition} に配置");
+            Debug.Log($"ハイブリッド暗号：秘密鍵を位置 {animPositions.privateKeyShowPosition} に配置");
             
             // 鍵生成エフェクト（秘密鍵が先、公開鍵が後）
             yield return StartCoroutine(GlowEffect(privateKey));
@@ -1431,7 +1448,7 @@ public class CryptoAnimationManager : MonoBehaviour
             // 鍵生成完了のエフェクト
             if (keyGenerationEffect != null)
             {
-                Instantiate(keyGenerationEffect, areaBPos, Quaternion.identity);
+                Instantiate(keyGenerationEffect, animPositions.areaBPosition, Quaternion.identity);
             }
             
             Debug.Log("ハイブリッド暗号1問目：鍵ペア生成完了（秘密鍵・公開鍵のみ表示）");
@@ -1554,9 +1571,12 @@ public class CryptoAnimationManager : MonoBehaviour
         {
             // 共通鍵と公開鍵を暗号化位置に移動
             Vector3 encryptPosition = animPositions.areaAPosition + Vector3.up * 2f;
+            Vector3 publicKeyTargetPosition = new Vector3(-3.5f, 5f, 10f); // 指定された移動先
             
             yield return StartCoroutine(MoveObject(symmetricKey, encryptPosition, moveAnimationTime / 2));
-            yield return StartCoroutine(MoveObject(publicKey, encryptPosition + Vector3.right, moveAnimationTime / 2));
+            yield return StartCoroutine(MoveObject(publicKey, publicKeyTargetPosition, moveAnimationTime / 2));
+            
+            Debug.Log($"ハイブリッド暗号5問目：公開鍵を位置 {publicKeyTargetPosition} に移動しました");
             
             // 公開鍵暗号化エフェクト
             StartCoroutine(GlowEffect(publicKey));
@@ -2275,5 +2295,60 @@ public class CryptoAnimationManager : MonoBehaviour
                 Debug.LogWarning($"ハイブリッド暗号：未対応のステップ {stepIndex}");
                 break;
         }
+    }
+
+    /// <summary>
+    /// キー位置テスト用メソッド（デバッグ専用）
+    /// Unityエディタから手動で呼び出して位置をテストできます
+    /// </summary>
+    [ContextMenu("Test Key Positions")]
+    public void TestKeyPositions()
+    {
+        Debug.Log("=== キー位置テスト開始 ===");
+        
+        if (publicKey != null)
+        {
+            publicKey.transform.position = animPositions.publicKeyShowPosition;
+            publicKey.SetActive(true);
+            Debug.Log($"公開鍵を位置 {animPositions.publicKeyShowPosition} に配置しました");
+        }
+        else
+        {
+            Debug.LogError("公開鍵オブジェクトが見つかりません");
+        }
+        
+        if (privateKey != null)
+        {
+            privateKey.transform.position = animPositions.privateKeyShowPosition;
+            privateKey.SetActive(true);
+            Debug.Log($"秘密鍵を位置 {animPositions.privateKeyShowPosition} に配置しました");
+        }
+        else
+        {
+            Debug.LogError("秘密鍵オブジェクトが見つかりません");
+        }
+        
+        Debug.Log("=== キー位置テスト完了 ===");
+    }
+    
+    /// <summary>
+    /// 現在のキー位置をログに出力（デバッグ用）
+    /// </summary>
+    [ContextMenu("Log Current Key Positions")]
+    public void LogCurrentKeyPositions()
+    {
+        Debug.Log("=== 現在のキー位置 ===");
+        
+        if (publicKey != null)
+        {
+            Debug.Log($"公開鍵の現在位置: {publicKey.transform.position} (期待位置: {animPositions.publicKeyShowPosition})");
+        }
+        
+        if (privateKey != null)
+        {
+            Debug.Log($"秘密鍵の現在位置: {privateKey.transform.position} (期待位置: {animPositions.privateKeyShowPosition})");
+        }
+        
+        Debug.Log("==================");
     }
 }

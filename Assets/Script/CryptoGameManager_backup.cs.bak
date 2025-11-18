@@ -217,17 +217,6 @@ public class CryptoGameManager : MonoBehaviour
     
     public void StartNewGameSet()
     {
-        // 理解度ゲージを新しいゲーム用にリセット
-        if (progressTracker != null)
-        {
-            progressTracker.ResetProgressForNewGame();
-            Debug.Log("CryptoGameManager: 理解度ゲージをリセットしました");
-        }
-        else
-        {
-            Debug.LogWarning("CryptoGameManager: ProgressTrackerが見つかりません");
-        }
-        
         // 有効化された暗号方式を確認
         List<CryptoType> availableTypes = GetEnabledCryptoTypes();
         if (availableTypes.Count == 0)
@@ -243,7 +232,7 @@ public class CryptoGameManager : MonoBehaviour
         questionsPerSet = availableTypes.Count;
         
         // ランダムに暗号方式の順序を決定
-        currentGameSet = GenerateRandomCryptoSet();
+        currentGameSet = GenerateOrderedCryptoSet();
         currentQuestionIndex = 0;
         currentStepIndex = 0;
         gameTimer = gameSetDuration;
@@ -272,29 +261,24 @@ public class CryptoGameManager : MonoBehaviour
         return types;
     }
     
-    private CryptoType[] GenerateRandomCryptoSet()
+    private CryptoType[] GenerateOrderedCryptoSet()
     {
-        List<CryptoType> types = GetEnabledCryptoTypes();
+        List<CryptoType> orderedTypes = new List<CryptoType>();
         
-        if (types.Count == 0)
+        // 固定順序： 1.Symmetric → 2.Public Key → 3.Hybrid
+        if (enableSymmetricKey) orderedTypes.Add(CryptoType.SymmetricKey);
+        if (enablePublicKey) orderedTypes.Add(CryptoType.PublicKey);
+        if (enableHybrid) orderedTypes.Add(CryptoType.Hybrid);
+        
+        if (orderedTypes.Count == 0)
         {
             Debug.LogError("有効な暗号方式がありません！");
             return new CryptoType[0];
         }
         
-        // シャッフル
-        for (int i = 0; i < types.Count; i++)
-        {
-            CryptoType temp = types[i];
-            int randomIndex = UnityEngine.Random.Range(i, types.Count);
-            types[i] = types[randomIndex];
-            types[randomIndex] = temp;
-        }
-        
-        return types.ToArray();
-    }
-    
-    private void StartCurrentQuestion()
+        Debug.Log($"固定順序で暗号方式を生成: {string.Join(" → ", orderedTypes)}");
+        return orderedTypes.ToArray();
+    }    private void StartCurrentQuestion()
     {
         if (currentQuestionIndex >= questionsPerSet)
         {
@@ -1181,23 +1165,6 @@ public class CryptoGameManager : MonoBehaviour
                 return new Vector3(0, 1, 0);
             default:
                 return new Vector3(0, 3, 5);
-        }
-    }
-
-    /// <summary>
-    /// 手動で理解度をリセットする（デバッグ用）
-    /// </summary>
-    public void ManualResetProgress()
-    {
-        if (progressTracker != null)
-        {
-            progressTracker.ResetProgressForNewGame();
-            UpdateProgressDisplay(); // UI更新
-            Debug.Log("CryptoGameManager: 理解度を手動でリセットしました");
-        }
-        else
-        {
-            Debug.LogWarning("CryptoGameManager: ProgressTrackerが見つかりません");
         }
     }
 }

@@ -233,4 +233,27 @@ public class ProgressTracker : MonoBehaviour
         }
         return true;
     }
+
+    /// <summary>
+    /// ゲーム開始時の理解度リセット
+    /// ゲームプレイ毎に理解度を0からスタートさせる
+    /// </summary>
+    public void ResetProgressForNewGame()
+    {
+        Debug.Log("ProgressTracker: 新しいゲーム開始のため理解度をリセット中...");
+        
+        // メモリ内のデータをリセット
+        InitializeProgress();
+        
+        // PlayerPrefsからも削除
+        foreach (var cryptoType in progressData.Keys)
+        {
+            string key = PROGRESS_KEY_PREFIX + cryptoType.ToString();
+            PlayerPrefs.DeleteKey(key);
+        }
+        
+        PlayerPrefs.Save();
+        
+        Debug.Log("ProgressTracker: 全ての理解度がリセットされました");
+    }
 }

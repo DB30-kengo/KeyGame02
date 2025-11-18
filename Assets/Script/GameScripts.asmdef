@@ -6,7 +6,6 @@
         "Unity.Cinemachine",
         "Unity.TextMeshPro",
         "Unity.AI.Navigation",
-        "Unity.ugui",
         "StarterAssets"
     ],
     "includePlatforms": [],
