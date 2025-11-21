@@ -38,9 +38,6 @@ public class ProgressTracker : MonoBehaviour
             float newProgress = Mathf.Min(currentProgress + increment, maxProgress);
             progressData[cryptoType] = newProgress;
             
-            // レベルアップチェック
-            CheckLevelUp(cryptoType, currentProgress, newProgress);
-            
             // データ保存
             SaveProgress();
         }
@@ -86,60 +83,7 @@ public class ProgressTracker : MonoBehaviour
         return 0; // 初心者
     }
     
-    public string GetLevelName(int level)
-    {
-        switch (level)
-        {
-            case 4: return "暗号マスター";
-            case 3: return "実践理解";
-            case 2: return "応用理解";
-            case 1: return "基礎理解";
-            default: return "初心者";
-        }
-    }
-    
-    private void CheckLevelUp(CryptoGameManager.CryptoType cryptoType, float oldProgress, float newProgress)
-    {
-        int oldLevel = GetLevelFromProgress(oldProgress);
-        int newLevel = GetLevelFromProgress(newProgress);
-        
-        if (newLevel > oldLevel)
-        {
-            OnLevelUp(cryptoType, newLevel);
-        }
-    }
-    
-    private int GetLevelFromProgress(float progress)
-    {
-        if (progress >= 90f) return 4;
-        if (progress >= 75f) return 3;
-        if (progress >= 50f) return 2;
-        if (progress >= 25f) return 1;
-        return 0;
-    }
-    
-    private void OnLevelUp(CryptoGameManager.CryptoType cryptoType, int newLevel)
-    {
-        string cryptoName = GetCryptoTypeName(cryptoType);
-        string levelName = GetLevelName(newLevel);
-        
-        // レベルアップ通知を表示
-        ShowLevelUpNotification(cryptoName, levelName);
-        
-        Debug.Log($"Level Up! {cryptoName}: {levelName}");
-    }
-    
-    private void ShowLevelUpNotification(string cryptoName, string levelName)
-    {
-        // UIマネージャーがあれば通知を表示
-        var uiManager = FindObjectOfType<CryptoUIManager>();
-        if (uiManager != null)
-        {
-            uiManager.ShowLevelUpNotification(cryptoName, levelName);
-        }
-    }
-    
-    private string GetCryptoTypeName(CryptoGameManager.CryptoType type)
+     private string GetCryptoTypeName(CryptoGameManager.CryptoType type)
     {
         switch (type)
         {
@@ -149,7 +93,7 @@ public class ProgressTracker : MonoBehaviour
             default: return "Unknown";
         }
     }
-    
+
     private void SaveProgress()
     {
         foreach (var kvp in progressData)

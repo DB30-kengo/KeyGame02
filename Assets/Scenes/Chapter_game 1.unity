@@ -4587,14 +4587,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 61baa10a78e9f4b8b80aa3236e182fc0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  levelUpNotificationPanel: {fileID: 441934690}
-  levelUpText: {fileID: 1527013039}
-  notificationDuration: 2
   correctAnswerEffect: {fileID: 0}
-  levelUpEffect: {fileID: 0}
   correctAnswerSound: {fileID: 0}
   incorrectAnswerSound: {fileID: 0}
-  levelUpSound: {fileID: 0}
   buttonScaleEffect: 1.2
   buttonEffectDuration: 0.2
   progressBarAnimationSpeed: 2

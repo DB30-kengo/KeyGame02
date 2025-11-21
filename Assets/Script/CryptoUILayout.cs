@@ -8,8 +8,20 @@ public class CryptoUILayout : MonoBehaviour
 {
     [Header("UI Layout Settings")]
     [Tooltip("自動でUI配置を行うか")]
-    public bool autoSetupLayout = true;
+    public bool autoSetupLayout = false;  // 手動配置を優先するため無効化
+
+    [Header("Custom Settings Override")]
+    [Tooltip("エディタで設定したカスタム値を優先する")]
+    public bool preserveCustomSettings = true;
     
+    [Header("Custom UI Values (preserveCustomSettings=true時に使用)")]
+    [Tooltip("QuestionTextのカスタムフォントサイズ")]
+    public int customQuestionFontSize = 32;
+    [Tooltip("ProgressTextのカスタムフォントサイズ")]
+    public int customProgressFontSize = 20;
+    [Tooltip("TimerTextのカスタムフォントサイズ")]
+    public int customTimerFontSize = 24;
+
     [Header("UI Elements")]
     public Canvas mainCanvas;
     public Text timerText;
@@ -59,30 +71,42 @@ public class CryptoUILayout : MonoBehaviour
         if (timerText != null)
         {
             RectTransform timerRect = timerText.GetComponent<RectTransform>();
-            timerRect.anchorMin = new Vector2(1, 1);
-            timerRect.anchorMax = new Vector2(1, 1);
-            timerRect.pivot = new Vector2(1, 1);
-            timerRect.anchoredPosition = new Vector2(-50, -30);
-            timerRect.sizeDelta = new Vector2(150, 40);
             
-            timerText.fontSize = 24;
+            // カスタム設定を優先しない場合のみ位置を変更
+            if (!preserveCustomSettings)
+            {
+                timerRect.anchorMin = new Vector2(1, 1);
+                timerRect.anchorMax = new Vector2(1, 1);
+                timerRect.pivot = new Vector2(1, 1);
+                timerRect.anchoredPosition = new Vector2(-50, -30);
+                timerRect.sizeDelta = new Vector2(150, 40);
+                timerText.alignment = TextAnchor.MiddleRight;
+            }
+            
+            // フォントサイズと色は設定に応じて適用
+            timerText.fontSize = preserveCustomSettings ? customTimerFontSize : 24;
             timerText.color = Color.white;
-            timerText.alignment = TextAnchor.MiddleRight;
         }
         
         // 進捗テキスト配置
         if (progressText != null)
         {
             RectTransform progressRect = progressText.GetComponent<RectTransform>();
-            progressRect.anchorMin = new Vector2(0.5f, 1);
-            progressRect.anchorMax = new Vector2(0.5f, 1);
-            progressRect.pivot = new Vector2(0.5f, 1);
-            progressRect.anchoredPosition = new Vector2(0, -80);
-            progressRect.sizeDelta = new Vector2(400, 30);
             
-            progressText.fontSize = 20;
+            // カスタム設定を優先しない場合のみ位置を変更
+            if (!preserveCustomSettings)
+            {
+                progressRect.anchorMin = new Vector2(0.5f, 1);
+                progressRect.anchorMax = new Vector2(0.5f, 1);
+                progressRect.pivot = new Vector2(0.5f, 1);
+                progressRect.anchoredPosition = new Vector2(0, -80);
+                progressRect.sizeDelta = new Vector2(400, 30);
+                progressText.alignment = TextAnchor.MiddleCenter;
+            }
+            
+            // フォントサイズと色は設定に応じて適用
+            progressText.fontSize = preserveCustomSettings ? customProgressFontSize : 20;
             progressText.color = Color.yellow;
-            progressText.alignment = TextAnchor.MiddleCenter;
         }
     }
     
@@ -91,15 +115,21 @@ public class CryptoUILayout : MonoBehaviour
         if (questionText != null)
         {
             RectTransform questionRect = questionText.GetComponent<RectTransform>();
-            questionRect.anchorMin = new Vector2(0.5f, 0.5f);
-            questionRect.anchorMax = new Vector2(0.5f, 0.5f);
-            questionRect.pivot = new Vector2(0.5f, 0.5f);
-            questionRect.anchoredPosition = new Vector2(0, 150);
-            questionRect.sizeDelta = new Vector2(800, 100);
             
-            questionText.fontSize = 32;
+            // カスタム設定を優先しない場合のみ位置を変更
+            if (!preserveCustomSettings)
+            {
+                questionRect.anchorMin = new Vector2(0.5f, 0.5f);
+                questionRect.anchorMax = new Vector2(0.5f, 0.5f);
+                questionRect.pivot = new Vector2(0.5f, 0.5f);
+                questionRect.anchoredPosition = new Vector2(0, 150);
+                questionRect.sizeDelta = new Vector2(800, 100);
+                questionText.alignment = TextAnchor.MiddleCenter;
+            }
+            
+            // フォントサイズと色は設定に応じて適用
+            questionText.fontSize = preserveCustomSettings ? customQuestionFontSize : 32;
             questionText.color = Color.white;
-            questionText.alignment = TextAnchor.MiddleCenter;
         }
     }
     
@@ -209,6 +239,53 @@ public class CryptoUILayout : MonoBehaviour
                 progressLabels[i].color = Color.white;
                 progressLabels[i].alignment = TextAnchor.MiddleLeft;
             }
+        }
+    }
+
+    /// <summary>
+    /// エディタで設定された現在の値を取得してカスタム設定に保存
+    /// </summary>
+    [ContextMenu("Capture Current UI Settings")]
+    public void CaptureCurrentUISettings()
+    {
+        if (questionText != null)
+        {
+            customQuestionFontSize = questionText.fontSize;
+            Debug.Log($"QuestionText FontSize captured: {customQuestionFontSize}");
+        }
+        
+        if (progressText != null)
+        {
+            customProgressFontSize = progressText.fontSize;
+            Debug.Log($"ProgressText FontSize captured: {customProgressFontSize}");
+        }
+        
+        if (timerText != null)
+        {
+            customTimerFontSize = timerText.fontSize;
+            Debug.Log($"TimerText FontSize captured: {customTimerFontSize}");
+        }
+        
+        Debug.Log("現在のUI設定をキャプチャしました。preserveCustomSettings = true にしてください。");
+    }
+    
+    /// <summary>
+    /// カスタム設定でUI要素を更新
+    /// </summary>
+    [ContextMenu("Apply Custom Settings")]
+    public void ApplyCustomSettings()
+    {
+        if (preserveCustomSettings)
+        {
+            if (questionText != null) questionText.fontSize = customQuestionFontSize;
+            if (progressText != null) progressText.fontSize = customProgressFontSize;
+            if (timerText != null) timerText.fontSize = customTimerFontSize;
+            
+            Debug.Log("カスタム設定を適用しました。");
+        }
+        else
+        {
+            Debug.LogWarning("preserveCustomSettings が false です。true に設定してください。");
         }
     }
 }

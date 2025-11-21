@@ -4,100 +4,17 @@ using UnityEngine.UI;
 
 public class CryptoUIManager : MonoBehaviour
 {
-    [Header("Notification UI")]
-    public GameObject levelUpNotificationPanel;
-    public Text levelUpText;
-    public float notificationDuration = 2f;
-    
     [Header("Visual Effects")]
     public ParticleSystem correctAnswerEffect;
-    public ParticleSystem levelUpEffect;
     public AudioSource correctAnswerSound;
     public AudioSource incorrectAnswerSound;
-    public AudioSource levelUpSound;
     
     [Header("Button Effects")]
     public float buttonScaleEffect = 1.2f;
     public float buttonEffectDuration = 0.2f;
-    
-    [Header("Progress Animation")]
+     [Header("Progress Animation")]
     public float progressBarAnimationSpeed = 2f;
-    
-    private Coroutine currentNotificationCoroutine;
-    
-    public void ShowLevelUpNotification(string cryptoName, string levelName)
-    {
-        if (currentNotificationCoroutine != null)
-        {
-            StopCoroutine(currentNotificationCoroutine);
-        }
-        
-        currentNotificationCoroutine = StartCoroutine(DisplayLevelUpNotification(cryptoName, levelName));
-    }
-    
-    private IEnumerator DisplayLevelUpNotification(string cryptoName, string levelName)
-    {
-        if (levelUpNotificationPanel != null && levelUpText != null)
-        {
-            levelUpText.text = $"🎉 レベルアップ！\n{cryptoName}\n{levelName} 達成";
-            
-            levelUpNotificationPanel.SetActive(true);
-            
-            // レベルアップエフェクト
-            PlayLevelUpEffects();
-            
-            // フェードイン
-            yield return StartCoroutine(FadeInNotification());
-            
-            // 表示時間
-            yield return new WaitForSeconds(notificationDuration);
-            
-            // フェードアウト
-            yield return StartCoroutine(FadeOutNotification());
-            
-            levelUpNotificationPanel.SetActive(false);
-        }
-        
-        currentNotificationCoroutine = null;
-    }
-    
-    private IEnumerator FadeInNotification()
-    {
-        CanvasGroup canvasGroup = levelUpNotificationPanel.GetComponent<CanvasGroup>();
-        if (canvasGroup == null)
-            canvasGroup = levelUpNotificationPanel.AddComponent<CanvasGroup>();
-        
-        float elapsedTime = 0f;
-        float fadeDuration = 0.3f;
-        
-        while (elapsedTime < fadeDuration)
-        {
-            elapsedTime += Time.deltaTime;
-            canvasGroup.alpha = Mathf.Lerp(0f, 1f, elapsedTime / fadeDuration);
-            yield return null;
-        }
-        
-        canvasGroup.alpha = 1f;
-    }
-    
-    private IEnumerator FadeOutNotification()
-    {
-        CanvasGroup canvasGroup = levelUpNotificationPanel.GetComponent<CanvasGroup>();
-        if (canvasGroup == null) yield break;
-        
-        float elapsedTime = 0f;
-        float fadeDuration = 0.3f;
-        
-        while (elapsedTime < fadeDuration)
-        {
-            elapsedTime += Time.deltaTime;
-            canvasGroup.alpha = Mathf.Lerp(1f, 0f, elapsedTime / fadeDuration);
-            yield return null;
-        }
-        
-        canvasGroup.alpha = 0f;
-    }
-    
+
     public void PlayCorrectAnswerEffects()
     {
         // パーティクルエフェクト
@@ -112,28 +29,13 @@ public class CryptoUIManager : MonoBehaviour
             correctAnswerSound.Play();
         }
     }
-    
+
     public void PlayIncorrectAnswerEffects()
     {
         // サウンドエフェクト
         if (incorrectAnswerSound != null)
         {
             incorrectAnswerSound.Play();
-        }
-    }
-    
-    private void PlayLevelUpEffects()
-    {
-        // パーティクルエフェクト
-        if (levelUpEffect != null)
-        {
-            levelUpEffect.Play();
-        }
-        
-        // サウンドエフェクト
-        if (levelUpSound != null)
-        {
-            levelUpSound.Play();
         }
     }
     
