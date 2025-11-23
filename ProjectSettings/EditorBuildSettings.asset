@@ -72,7 +72,7 @@ EditorBuildSettings:
     path: Assets/Scenes/Prototype/New_Chapter06.unity
     guid: b4d890445d4f64704a8a1d0904e11dd5
   - enabled: 1
-    path: Assets/Scenes/Chapter_game.unity
+    path: Assets/Scenes/6_Play_Game.unity
     guid: 997316103c65b41f199d96f9a2322f63
   - enabled: 1
     path: Assets/Scenes/HintScene.unity
