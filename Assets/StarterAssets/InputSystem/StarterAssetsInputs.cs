@@ -13,6 +13,10 @@ namespace StarterAssets
 
 		[Header("Movement Settings")]
 		public bool analogMovement;
+		
+		[Header("Input Control")]
+		[Tooltip("プレイヤー入力を有効にするかどうか")]
+		public bool inputEnabled = true;
 
 		[Header("Mouse Cursor Settings")]
 		public bool cursorLocked = true;
@@ -20,12 +24,19 @@ namespace StarterAssets
 
 		public void OnMove(InputValue value)
 		{
-			MoveInput(value.Get<Vector2>());
+			if (inputEnabled)
+			{
+				MoveInput(value.Get<Vector2>());
+			}
+			else
+			{
+				MoveInput(Vector2.zero);
+			}
 		}
 
 		public void OnLook(InputValue value)
 		{
-			if(cursorInputForLook)
+			if(cursorInputForLook && inputEnabled)
 			{
 				LookInput(value.Get<Vector2>());
 			}
@@ -33,12 +44,26 @@ namespace StarterAssets
 
 		public void OnJump(InputValue value)
 		{
-			JumpInput(value.isPressed);
+			if (inputEnabled)
+			{
+				JumpInput(value.isPressed);
+			}
+			else
+			{
+				JumpInput(false);
+			}
 		}
 
 		public void OnSprint(InputValue value)
 		{
-			SprintInput(value.isPressed);
+			if (inputEnabled)
+			{
+				SprintInput(value.isPressed);
+			}
+			else
+			{
+				SprintInput(false);
+			}
 		}
 
 
@@ -60,6 +85,35 @@ namespace StarterAssets
 		public void SprintInput(bool newSprintState)
 		{
 			sprint = newSprintState;
+		}
+		
+		/// <summary>
+		/// プレイヤー入力の有効/無効を設定
+		/// </summary>
+		/// <param name="enabled">trueで入力有効、falseで入力無効</param>
+		public void SetInputEnabled(bool enabled)
+		{
+			inputEnabled = enabled;
+			
+			// 入力を無効にする場合は全ての入力値をクリア
+			if (!enabled)
+			{
+				move = Vector2.zero;
+				look = Vector2.zero;
+				jump = false;
+				sprint = false;
+			}
+			
+			Debug.Log($"[StarterAssetsInputs] プレイヤー入力を{(enabled ? "有効" : "無効")}にしました");
+		}
+		
+		/// <summary>
+		/// 現在の入力有効状態を取得
+		/// </summary>
+		/// <returns>入力が有効かどうか</returns>
+		public bool IsInputEnabled()
+		{
+			return inputEnabled;
 		}
 
 		private void OnApplicationFocus(bool hasFocus)

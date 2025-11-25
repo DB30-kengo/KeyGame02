@@ -50,6 +50,9 @@ public class CryptoGameManager : MonoBehaviour
     [Tooltip("プレイヤーオブジェクト（正解時に位置をリセット）")]
     public Transform player;
     
+    [Tooltip("プレイヤー入力制御コンポーネント")]
+    public StarterAssets.StarterAssetsInputs playerInput;
+    
     [Space(5)]
     [Tooltip("プレイヤーの復帰位置設定")]
     public PlayerResetSettings resetSettings;
@@ -129,6 +132,26 @@ public class CryptoGameManager : MonoBehaviour
     
     // 進捗管理
     private ProgressTracker progressTracker;
+    
+    /// <summary>
+    /// 現在のゲームタイプを取得（外部アクセス用）
+    /// </summary>
+    public CryptoType? CurrentCryptoType
+    {
+        get
+        {
+            if (currentGameSet != null && currentQuestionIndex >= 0 && currentQuestionIndex < currentGameSet.Length)
+            {
+                return currentGameSet[currentQuestionIndex];
+            }
+            return null;
+        }
+    }
+    
+    /// <summary>
+    /// ゲームが進行中かどうか
+    /// </summary>
+    public bool IsGameActive => isGameActive;
     
     public enum CryptoType
     {
@@ -275,6 +298,34 @@ public class CryptoGameManager : MonoBehaviour
             }
         }
         
+        // プレイヤー入力コンポーネントの自動検索
+        if (playerInput == null)
+        {
+            // プレイヤーオブジェクトから検索
+            if (player != null)
+            {
+                playerInput = player.GetComponent<StarterAssets.StarterAssetsInputs>();
+                if (playerInput != null)
+                {
+                    Debug.Log($"プレイヤー入力コンポーネントを自動検出しました: {player.name}");
+                }
+            }
+            
+            // まだ見つからない場合はシーン全体から検索
+            if (playerInput == null)
+            {
+                playerInput = FindObjectOfType<StarterAssets.StarterAssetsInputs>();
+                if (playerInput != null)
+                {
+                    Debug.Log($"プレイヤー入力コンポーネントをシーンから検出しました: {playerInput.name}");
+                }
+                else
+                {
+                    Debug.LogWarning("プレイヤー入力コンポーネントが見つかりません。ゲーム終了時の入力制御ができない可能性があります。");
+                }
+            }
+        }
+        
         // ゲーム用カーソル設定
         SetGameCursor();
         
@@ -412,6 +463,9 @@ public class CryptoGameManager : MonoBehaviour
         correctAnswers = 0;
         totalQuestions = 0;
         currentScore = 0;
+        
+        // プレイヤー入力を有効化
+        EnablePlayerInput();
         
         // スコア表示の初期化
         UpdateScoreDisplay();
@@ -1209,7 +1263,7 @@ public class CryptoGameManager : MonoBehaviour
         if (existingPanel != null)
         {
             Debug.Log("🗑️ 既存の解説パネルを削除");
-            DestroyImmediate(existingPanel);
+            Destroy(existingPanel);
             yield return new WaitForEndOfFrame();
         }
         
@@ -1777,9 +1831,9 @@ public class CryptoGameManager : MonoBehaviour
     {
         Debug.Log($"[OnCorrectAnswer開始] currentStepIndex: {currentStepIndex}, currentQuestionIndex: {currentQuestionIndex}");
         
-        // 理解度を更新
+        // 新しい進度システムで正解処理
         CryptoType currentType = currentGameSet[currentQuestionIndex];
-        progressTracker.UpdateProgress(currentType, 20f); // 5問構成なので20%ずつ
+        progressTracker.OnCorrectAnswer(currentType);
         
         // 進捗UI表示を即座に更新（アニメーション付き）
         UpdateProgressDisplay();
@@ -1810,6 +1864,8 @@ public class CryptoGameManager : MonoBehaviour
             }
             else
             {
+                // セット完了処理
+                progressTracker.OnSetCompleted(currentType);
                 EndGameSet();
             }
         }
@@ -1889,6 +1945,10 @@ public class CryptoGameManager : MonoBehaviour
     private void EndGameSet()
     {
         isGameActive = false;
+        
+        // プレイヤー入力を無効化
+        DisablePlayerInput();
+        
         ShowResults();
     }
     
@@ -1958,6 +2018,9 @@ public class CryptoGameManager : MonoBehaviour
         return "Keep Learning!";
     }
     
+    // 進度表示更新のロック
+    private bool isUpdatingProgress = false;
+    
     private void UpdateProgressDisplay()
     {
         if (progressTracker == null)
@@ -1966,35 +2029,76 @@ public class CryptoGameManager : MonoBehaviour
             return;
         }
         
-        float[] progressValues = progressTracker.GetAllProgress();
-        string[] cryptoNames = { "共通鍵", "公開鍵", "ハイブリッド" };
-        
-        if (progressSliders != null && progressLabels != null)
+        // 更新中の場合はスキップして重複を防ぐ
+        if (isUpdatingProgress)
         {
-            for (int i = 0; i < progressSliders.Length && i < progressValues.Length; i++)
+            Debug.Log("[CryptoGameManager] 進度表示更新中のため、重複更新をスキップ");
+            return;
+        }
+        
+        isUpdatingProgress = true;
+        
+        try
+        {
+            float[] progressValues = progressTracker.GetAllProgress();
+            string[] cryptoNames = { "共通鍵", "公開鍵", "ハイブリッド" };
+            
+            Debug.Log($"[CryptoGameManager] 進度表示更新開始 - 値: [{string.Join(", ", progressValues.Select(v => v.ToString("F1")))}]");
+            
+            if (progressSliders != null && progressLabels != null)
             {
-                if (progressSliders[i] != null)
+                for (int i = 0; i < progressSliders.Length && i < progressValues.Length; i++)
                 {
-                    // 既存のアニメーションがある場合は停止
-                    if (sliderAnimations.ContainsKey(i))
+                    if (progressSliders[i] != null)
                     {
-                        StopCoroutine(sliderAnimations[i]);
+                        // スライダーのmaxValueを確認してから適切な値を設定
+                        float targetValue;
+                        if (progressSliders[i].maxValue == 1f)
+                        {
+                            // maxValueが1の場合は100で割る
+                            targetValue = progressValues[i] / 100f;
+                        }
+                        else
+                        {
+                            // maxValueが100の場合はそのまま
+                            targetValue = progressValues[i];
+                        }
+                        
+                        Debug.Log($"[CryptoGameManager] スライダー[{i}] 目標値: {targetValue:F3} (元値: {progressValues[i]:F1}%, maxValue: {progressSliders[i].maxValue})");
+                        
+                        // 既存のアニメーションがある場合は停止
+                        if (sliderAnimations.ContainsKey(i))
+                        {
+                            StopCoroutine(sliderAnimations[i]);
+                        }
+                        
+                        // 新しいアニメーションを開始
+                        sliderAnimations[i] = StartCoroutine(AnimateProgressSlider(progressSliders[i], targetValue, i));
                     }
                     
-                    // 新しいアニメーションを開始
-                    sliderAnimations[i] = StartCoroutine(AnimateProgressSlider(progressSliders[i], progressValues[i] / 100f, i));
-                }
-                
-                if (i < progressLabels.Length && progressLabels[i] != null)
-                {
-                    progressLabels[i].text = $"{cryptoNames[i]} {progressValues[i]:F0}%";
+                    if (i < progressLabels.Length && progressLabels[i] != null)
+                    {
+                        progressLabels[i].text = $"{cryptoNames[i]} {progressValues[i]:F0}%";
+                    }
                 }
             }
+            else
+            {
+                Debug.LogWarning("Progress Sliders または Progress Labels が割り当てられていません");
+            }
         }
-        else
+        finally
         {
-            Debug.LogWarning("Progress Sliders または Progress Labels が割り当てられていません");
+            // 少し遅らせてロックを解除（アニメーション開始後）
+            StartCoroutine(ReleaseLockAfterDelay());
         }
+    }
+    
+    private IEnumerator ReleaseLockAfterDelay()
+    {
+        yield return new WaitForSeconds(0.1f); // アニメーション開始を待つ
+        isUpdatingProgress = false;
+        Debug.Log("[CryptoGameManager] 進度表示更新ロック解除");
     }
     
     /// <summary>
@@ -2005,6 +2109,8 @@ public class CryptoGameManager : MonoBehaviour
         float startValue = slider.value;
         float elapsedTime = 0f;
         bool isIncreasing = targetValue > startValue;
+        
+        Debug.Log($"[CryptoGameManager] スライダー[{index}]アニメーション開始: {startValue:F3} -> {targetValue:F3} (maxValue: {slider.maxValue})");
         
         // 進捗増加時は色を変更
         Image fillImage = slider.fillRect.GetComponent<Image>();
@@ -2028,6 +2134,8 @@ public class CryptoGameManager : MonoBehaviour
         
         // 最終値を設定
         slider.value = targetValue;
+        
+        Debug.Log($"[CryptoGameManager] スライダー[{index}]アニメーション完了: 最終値 {slider.value:F3}");
         
         // 色を元に戻す（少し遅らせて）
         if (isIncreasing && fillImage != null)
@@ -2232,6 +2340,87 @@ public class CryptoGameManager : MonoBehaviour
         if (currentScore < 0) currentScore = 0;
         UpdateScoreDisplay();
         Debug.Log($"不正解... {pointsPerIncorrect}点 (合計: {currentScore}点)");
+        
+        // 新しい進度システムで不正解処理
+        if (currentGameSet != null && currentQuestionIndex >= 0 && currentQuestionIndex < currentGameSet.Length)
+        {
+            CryptoType currentType = currentGameSet[currentQuestionIndex];
+            progressTracker.OnIncorrectAnswer(currentType);
+            
+            // 進捗UI表示を更新（減少アニメーション付き）
+            UpdateProgressDisplay();
+            
+            // 不正解時の特別な視覚効果
+            StartCoroutine(ShowIncorrectAnswerEffect(currentType));
+            
+            Debug.Log($"[CryptoGameManager] 不正解処理完了: {currentType}, ゲージが減少しました");
+        }
+        else
+        {
+            Debug.LogWarning("[CryptoGameManager] 不正解処理: 有効なゲーム状態ではありません");
+        }
+    }
+    
+    /// <summary>
+    /// 不正解時の視覚効果
+    /// </summary>
+    private IEnumerator ShowIncorrectAnswerEffect(CryptoType cryptoType)
+    {
+        // プログレススライダーを一時的に赤色に変更
+        if (progressSliders != null)
+        {
+            int cryptoIndex = (int)cryptoType;
+            if (cryptoIndex >= 0 && cryptoIndex < progressSliders.Length && progressSliders[cryptoIndex] != null)
+            {
+                Image fillImage = progressSliders[cryptoIndex].fillRect?.GetComponent<Image>();
+                if (fillImage != null)
+                {
+                    Color originalColor = fillImage.color;
+                    Color errorColor = Color.red;
+                    
+                    // 赤色に変更
+                    fillImage.color = errorColor;
+                    
+                    // 0.5秒待機
+                    yield return new WaitForSeconds(0.5f);
+                    
+                    // 徐々に元の色に戻す
+                    float fadeTime = 0.5f;
+                    float elapsedTime = 0f;
+                    
+                    while (elapsedTime < fadeTime)
+                    {
+                        float t = elapsedTime / fadeTime;
+                        fillImage.color = Color.Lerp(errorColor, originalColor, t);
+                        elapsedTime += Time.deltaTime;
+                        yield return null;
+                    }
+                    
+                    fillImage.color = originalColor;
+                }
+            }
+        }
+        
+        // 進度ラベルに一時的にエラーメッセージを表示
+        if (progressLabels != null)
+        {
+            int cryptoIndex = (int)cryptoType;
+            if (cryptoIndex >= 0 && cryptoIndex < progressLabels.Length && progressLabels[cryptoIndex] != null)
+            {
+                string originalText = progressLabels[cryptoIndex].text;
+                Color originalTextColor = progressLabels[cryptoIndex].color;
+                
+                // 一時的にエラーメッセージを表示
+                progressLabels[cryptoIndex].text = $"{GetCryptoTypeName(cryptoType)}: ゲージ減少！";
+                progressLabels[cryptoIndex].color = Color.red;
+                
+                yield return new WaitForSeconds(1.5f);
+                
+                // 元のテキストに戻す
+                progressLabels[cryptoIndex].text = originalText;
+                progressLabels[cryptoIndex].color = originalTextColor;
+            }
+        }
     }
     
     /// <summary>
@@ -2841,7 +3030,7 @@ public class CryptoGameManager : MonoBehaviour
         // 既存パネルを削除
         if (explanationPanel != null)
         {
-            DestroyImmediate(explanationPanel);
+            Destroy(explanationPanel);
             explanationPanel = null;
             explanationText = null;
             Debug.Log("🗑️ 既存パネル削除完了");
@@ -3013,7 +3202,14 @@ public class CryptoGameManager : MonoBehaviour
     /// </summary>
     private IEnumerator WaitForRestartInput()
     {
-        Debug.Log("🎮 Enterキー入力待機開始");
+        Debug.Log("🎮 Enterキー入力待機開始（プレイヤー移動は無効）");
+        
+        // プレイヤー入力が無効化されていることを確認
+        if (playerInput != null && playerInput.IsInputEnabled())
+        {
+            Debug.Log("[WaitForRestartInput] プレイヤー入力が有効になっていたため、無効化します");
+            DisablePlayerInput();
+        }
         
         // Enterキーが押されるまで待機
         while (true)
@@ -3160,7 +3356,7 @@ public class CryptoGameManager : MonoBehaviour
         GameObject existingPanel = GameObject.Find("DynamicExplanationPanel");
         if (existingPanel != null)
         {
-            DestroyImmediate(existingPanel);
+            Destroy(existingPanel);
             yield return new WaitForEndOfFrame();
         }
         
@@ -3267,7 +3463,7 @@ public class CryptoGameManager : MonoBehaviour
             // 14. パネル削除
             if (explanationPanel != null)
             {
-                DestroyImmediate(explanationPanel);
+                Destroy(explanationPanel);
                 Debug.Log("✅ 解説パネル削除完了");
             }
             
@@ -3276,6 +3472,38 @@ public class CryptoGameManager : MonoBehaviour
         }
         
         Debug.Log("✅ キャンバス解説表示完了");
+    }
+
+    /// <summary>
+    /// プレイヤー入力を無効化
+    /// </summary>
+    private void DisablePlayerInput()
+    {
+        if (playerInput != null)
+        {
+            playerInput.SetInputEnabled(false);
+            Debug.Log("[CryptoGameManager] プレイヤー入力を無効化しました");
+        }
+        else
+        {
+            Debug.LogWarning("[CryptoGameManager] プレイヤー入力コンポーネントが見つかりません。入力無効化をスキップします。");
+        }
+    }
+    
+    /// <summary>
+    /// プレイヤー入力を有効化
+    /// </summary>
+    private void EnablePlayerInput()
+    {
+        if (playerInput != null)
+        {
+            playerInput.SetInputEnabled(true);
+            Debug.Log("[CryptoGameManager] プレイヤー入力を有効化しました");
+        }
+        else
+        {
+            Debug.LogWarning("[CryptoGameManager] プレイヤー入力コンポーネントが見つかりません。入力有効化をスキップします。");
+        }
     }
 
 }

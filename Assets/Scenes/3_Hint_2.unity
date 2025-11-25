@@ -552,6 +552,7 @@ GameObject:
   m_Component:
   - component: {fileID: 845915891}
   - component: {fileID: 845915894}
+  - component: {fileID: 845915895}
   - component: {fileID: 845915893}
   - component: {fileID: 845915892}
   m_Layer: 5
@@ -663,6 +664,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 845915890}
   m_CullTransparentMesh: 1
+--- !u!114 &845915895
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 845915890}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 5_Hint_1
+  useFadeTransition: 0
+  fadeTime: 1
+  targetButton: {fileID: 845915892}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &863991423
 GameObject:
   m_ObjectHideFlags: 0
@@ -1110,6 +1130,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1541712211}
   - component: {fileID: 1541712214}
+  - component: {fileID: 1541712215}
   - component: {fileID: 1541712213}
   - component: {fileID: 1541712212}
   m_Layer: 5
@@ -1221,6 +1242,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1541712210}
   m_CullTransparentMesh: 1
+--- !u!114 &1541712215
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541712210}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 6_Play_Game
+  useFadeTransition: 1
+  fadeTime: 1
+  targetButton: {fileID: 1541712212}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &1578671117
 GameObject:
   m_ObjectHideFlags: 0
@@ -1231,6 +1271,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1578671118}
   - component: {fileID: 1578671121}
+  - component: {fileID: 1578671122}
   - component: {fileID: 1578671120}
   - component: {fileID: 1578671119}
   m_Layer: 5
@@ -1342,6 +1383,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1578671117}
   m_CullTransparentMesh: 1
+--- !u!114 &1578671122
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1578671117}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 4_Hint_1
+  useFadeTransition: 0
+  fadeTime: 1
+  targetButton: {fileID: 1578671119}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &1624813127
 GameObject:
   m_ObjectHideFlags: 0
@@ -1352,6 +1412,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1624813128}
   - component: {fileID: 1624813131}
+  - component: {fileID: 1624813132}
   - component: {fileID: 1624813130}
   - component: {fileID: 1624813129}
   m_Layer: 5
@@ -1463,6 +1524,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1624813127}
   m_CullTransparentMesh: 1
+--- !u!114 &1624813132
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1624813127}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 3_Hint_1
+  useFadeTransition: 0
+  fadeTime: 1
+  targetButton: {fileID: 1624813129}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &1728844884
 GameObject:
   m_ObjectHideFlags: 0

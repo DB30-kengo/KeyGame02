@@ -383,7 +383,7 @@ private IEnumerator ShowExplanationOnCanvas(string explanation)
 {
     // 1. 既存パネル削除
     GameObject existingPanel = GameObject.Find("DynamicExplanationPanel");
-    if (existingPanel != null) DestroyImmediate(existingPanel);
+    if (existingPanel != null) Destroy(existingPanel);
     
     // 2. Canvas取得
     Canvas targetCanvas = FindBestCanvas();
@@ -410,7 +410,7 @@ private IEnumerator ShowExplanationOnCanvas(string explanation)
     
     // 7. 4秒間表示後自動削除
     yield return new WaitForSeconds(4f);
-    DestroyImmediate(explanationPanel);
+    Destroy(explanationPanel);
 }
 ```
 
@@ -575,8 +575,6 @@ private IEnumerator RetryCurrentQuestion(string explanation)
 
 この修正により、プレイヤーは正解・不正解に関わらず、常に同じ指定位置に移動するようになり、一貫したゲーム体験を提供できるようになりました。
 
-この修正により、プレイヤーは正解・不正解に関わらず、常に同じ指定位置に移動するようになり、一貫したゲーム体験を提供できるようになりました。
-
 ## プレイヤー位置移動の実行順序最適化（2025年11月21日）
 
 ### 改善要求
@@ -628,3 +626,445 @@ yield return StartCoroutine(ShowExplanationOnCanvas(explanation));
 `StartCoroutine()`を使用してプレイヤー移動を非同期で開始し、解説表示と並行して処理されるため、全体的な応答性が向上します。
 
 この修正により、不正解時のユーザー体験が大幅に改善され、より自然で快適なゲームフローを提供できるようになりました。
+
+## 物理トリガー中のDestroyImmediate問題修正（2025年11月24日）
+
+### 問題
+物理トリガーコールバック中に`DestroyImmediate`を使用したため、以下のエラーが発生していました：
+
+```
+Destroying GameObjects immediately is not permitted during physics trigger/contact, 
+animation event callbacks, rendering callbacks or OnValidate. You must use Destroy instead.
+```
+
+### 原因分析
+1. **物理システム制限**: Unityの物理システムは計算中に即座なGameObject削除を禁止している
+2. **トリガー実行コンテキスト**: `OnTriggerEnter`コールバック中に`DestroyImmediate`が実行された
+3. **解説パネル管理**: 既存解説パネル削除時に`DestroyImmediate`を使用していた
+
+### 修正内容
+すべての`DestroyImmediate`を`Destroy`に変更しました：
+
+#### 1. ShowExplanationOnCanvas メソッド
+```csharp
+// 修正前
+DestroyImmediate(existingPanel);
+
+// 修正後
+Destroy(existingPanel);
+```
+
+#### 2. CreateExplanationPanelDynamically メソッド
+```csharp
+// 修正前
+DestroyImmediate(existingPanel);
+
+// 修正後
+Destroy(existingPanel);
+```
+
+#### 3. ForceRecreateExplanationPanel メソッド
+```csharp
+// 修正前
+DestroyImmediate(explanationPanel);
+
+// 修正後
+Destroy(explanationPanel);
+```
+
+#### 4. 解説パネル削除処理
+```csharp
+// 修正前
+DestroyImmediate(explanationPanel);
+
+// 修正後
+Destroy(explanationPanel);
+```
+
+### 技術的差異
+| 項目 | DestroyImmediate | Destroy |
+|------|-------------------|---------|
+| 削除タイミング | 即座に削除 | フレーム終了時に削除 |
+| 物理コールバック中 | 使用禁止 ❌ | 使用可能 ✅ |
+| パフォーマンス | 高負荷 | 最適化済み |
+| 安全性 | 制限あり | 安全 |
+
+### 修正後の動作
+- ✅ 物理トリガー中でもエラーなく動作
+- ✅ 解説パネルの適切な削除・作成
+- ✅ フレーム終了時の安全な削除処理
+- ✅ Unityの推奨パターンに準拠
+
+### 呼び出しスタック解決
+```
+CryptoAnswerCube:OnTriggerEnter() 
+→ CryptoGameManager:OnAnswerSelected() 
+→ RetryCurrentQuestion() 
+→ ShowExplanationOnCanvas() 
+→ Destroy() ✅ (DestroyImmediate() ❌)
+```
+
+### 待機処理の維持
+`yield return new WaitForEndOfFrame();` を維持して、削除処理の完了を確実に待機します。
+
+この修正により、物理システムとの競合が解決され、安定した解説パネル表示システムが実現されました。
+
+## 理解度ゲージ仕様変更とリセットボタン実装（2025年11月25日）
+
+### 仕様変更の概要
+理解度ゲージの管理方式を**自動リセット**から**手動リセット**に変更し、学習進度を保持する仕様に変更しました。
+
+### 変更前の仕様
+- ✅ ゲーム開始時に自動で理解度ゲージがリセットされる
+- ❌ 学習進度が毎回0からスタート
+- ❌ 継続的な学習効果が反映されない
+
+### 変更後の仕様  
+- ✅ ゲージは保持され、少しずつ上がっていく
+- ✅ 手動リセットボタンでのみリセット可能
+- ✅ 学習の継続性と成長実感を提供
+
+### 実装内容
+
+#### 1. ProgressTracker.cs の修正
+```csharp
+/// <summary>
+/// 手動リセット用メソッド（ボタンから呼び出し）
+/// ボタンが押されたときのみ理解度をリセット
+/// </summary>
+public void ManualResetProgress()
+{
+    Debug.Log("ProgressTracker: 手動リセットが実行されました");
+    
+    // メモリ内のデータをリセット
+    InitializeProgress();
+    
+    // PlayerPrefsからも削除
+    foreach (var cryptoType in progressData.Keys)
+    {
+        string key = PROGRESS_KEY_PREFIX + cryptoType.ToString();
+        PlayerPrefs.DeleteKey(key);
+    }
+    
+    PlayerPrefs.Save();
+    
+    Debug.Log("ProgressTracker: 全ての理解度がリセットされました");
+}
+
+/// <summary>
+/// 旧自動リセットメソッド（廃止予定）
+/// 互換性のため残すが、実行しない
+/// </summary>
+[System.Obsolete("自動リセットは廃止されました。ManualResetProgress()を使用してください。")]
+public void ResetProgressForNewGame()
+{
+    Debug.Log("ProgressTracker: 自動リセットは無効化されています。手動リセットボタンを使用してください。");
+    // 何も実行しない（ゲージを保持）
+}
+```
+
+#### 2. ProgressResetButton.cs の作成
+新しいスクリプト `ProgressResetButton.cs` を作成し、以下の機能を実装：
+
+##### 🎯 **主要機能**
+1. **インスペクター設定**: ボタンとProgressTrackerを指定可能
+2. **確認ダイアログ**: リセット前の確認表示（オプション）
+3. **視覚的フィードバック**: 成功/エラー表示
+4. **自動検出**: ボタンとProgressTrackerの自動取得
+5. **エラーハンドリング**: 適切なエラー処理と表示
+
+##### 🔧 **インスペクター設定項目**
+
+**ボタン設定**
+- `Reset Button`: リセットボタン（自動取得または手動設定）
+
+**ProgressTracker設定**  
+- `Progress Tracker`: 対象ProgressTrackerの指定
+
+**確認ダイアログ設定**
+- `Show Confirmation Dialog`: 確認ダイアログの有効/無効
+- `Confirmation Message`: カスタム確認メッセージ
+
+**視覚的フィードバック設定**
+- `Enable Visual Feedback`: フィードバック効果の有効/無効
+- `Feedback Display Time`: 表示時間（0.5〜3.0秒）
+- `Feedback Message`: カスタムフィードバックメッセージ
+
+**UI参照（オプション）**
+- `Feedback Text`: フィードバック表示用テキスト
+- `Feedback Panel`: フィードバック表示用パネル
+
+**デバッグ設定**
+- `Enable Debug Log`: デバッグログの有効/無効
+
+### 使用方法
+
+#### Step 1: スクリプト追加
+1. リセットボタンのGameObjectを選択
+2. `Add Component` → `Progress Reset Button` を追加
+
+#### Step 2: 設定
+1. **Progress Tracker**: 対象のProgressTrackerをドラッグ&ドロップ
+2. **Reset Button**: ボタンを指定（自動取得されない場合）
+3. 必要に応じて他の設定を調整
+
+#### Step 3: 動作確認
+1. プレイモードでボタンをクリック
+2. 確認ダイアログが表示されることを確認
+3. リセット実行後、ゲージが0になることを確認
+
+### テスト機能
+- **Context Menu**: 「Test Reset」でテスト実行
+- **Settings Validation**: 「Validate Settings」で設定確認
+- **Debug Log**: 詳細な動作ログ
+
+### スクリプトメソッド
+```csharp
+// 外部からの強制リセット
+progressResetButton.ForceReset();
+
+// ProgressTrackerの動的設定
+progressResetButton.SetProgressTracker(newTracker);
+
+// ボタンの有効/無効切り替え
+progressResetButton.SetButtonInteractable(false);
+```
+
+### 技術的利点
+1. **学習継続性**: ゲージが保持され、成長実感を提供
+2. **ユーザー制御**: 手動でのリセット決定権
+3. **柔軟性**: インスペクターでの詳細設定
+4. **安全性**: 確認ダイアログによる誤操作防止
+5. **フィードバック**: 視覚的な操作結果表示
+
+### 互換性
+- 旧`ResetProgressForNewGame()`メソッドは`[System.Obsolete]`でマーク
+- 既存コードとの互換性を保持（実行はしない）
+- CryptoGameManager内の自動リセット呼び出しは無効化される
+
+この変更により、学習者の継続的な成長を支援し、より効果的な学習体験を提供できるようになりました。
+
+## シーン間ProgressTracker連携システム実装（2025年11月25日）
+
+### 問題
+ProgressTrackerとリセットボタンが別々のシーンに存在するため、シーン間でのデータ共有と操作が困難でした。
+
+### 解決策
+**DontDestroyOnLoad**による永続化と**静的メソッド**によるシーン間アクセス、**PlayerPrefs**によるデータ同期を実装しました。
+
+### 実装内容
+
+#### 1. ProgressTracker.cs の拡張
+
+##### シーン間永続化機能
+```csharp
+[Header("シーン間永続化設定")]
+[Tooltip("シーン切り替え時にオブジェクトを保持するか")]
+public bool persistAcrossScenes = true;
+
+[Tooltip("シングルトンパターンを使用するか")]
+public bool useSingletonPattern = true;
+
+// シングルトンインスタンス
+public static ProgressTracker Instance { get; private set; }
+
+private void Awake()
+{
+    // シングルトンパターンの実装
+    if (useSingletonPattern)
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+    
+    // シーン間永続化
+    if (persistAcrossScenes)
+    {
+        DontDestroyOnLoad(gameObject);
+    }
+    
+    // ...existing code...
+}
+```
+
+##### 静的アクセスメソッド
+```csharp
+/// <summary>
+/// 静的メソッド：シングルトンインスタンスから手動リセットを実行
+/// </summary>
+public static void ResetProgressStatic()
+
+/// <summary>
+/// PlayerPrefs経由での直接リセット（インスタンスがない場合）
+/// </summary>
+public static void ResetProgressViaPlayerPrefs()
+
+/// <summary>
+/// 静的メソッド：進度データを取得（インスタンス不要）
+/// </summary>
+public static float GetProgressStatic(CryptoGameManager.CryptoType cryptoType)
+
+/// <summary>
+/// 静的メソッド：全ての進度データを取得
+/// </summary>
+public static Dictionary<CryptoGameManager.CryptoType, float> GetAllProgressStatic()
+```
+
+#### 2. ProgressResetButton.cs の強化
+
+##### シーン間操作モード
+```csharp
+public enum CrossSceneMode
+{
+    UseStaticMethods,     // 静的メソッドを使用
+    FindInCurrentScene,   // 現在のシーンで検索
+    UsePlayerPrefs       // PlayerPrefs経由で直接操作
+}
+
+[Header("ProgressTracker設定")]
+public ProgressTracker progressTracker;
+public bool enableCrossSceneOperation = true;
+public CrossSceneMode crossSceneMode = CrossSceneMode.UseStaticMethods;
+```
+
+##### マルチモード対応リセット処理
+```csharp
+private void ExecuteReset()
+{
+    bool resetSuccess = false;
+    
+    // 直接設定されている場合
+    if (progressTracker != null)
+    {
+        progressTracker.ManualResetProgress();
+        resetSuccess = true;
+    }
+    // シーン間操作が有効な場合
+    else if (enableCrossSceneOperation)
+    {
+        switch (crossSceneMode)
+        {
+            case CrossSceneMode.UseStaticMethods:
+                ProgressTracker.ResetProgressStatic();
+                resetSuccess = true;
+                break;
+                
+            case CrossSceneMode.FindInCurrentScene:
+                ProgressTracker foundTracker = FindObjectOfType<ProgressTracker>();
+                if (foundTracker != null)
+                {
+                    foundTracker.ManualResetProgress();
+                    resetSuccess = true;
+                }
+                else
+                {
+                    ProgressTracker.ResetProgressViaPlayerPrefs();
+                    resetSuccess = true;
+                }
+                break;
+                
+            case CrossSceneMode.UsePlayerPrefs:
+                ProgressTracker.ResetProgressViaPlayerPrefs();
+                resetSuccess = true;
+                break;
+        }
+    }
+}
+```
+
+#### 3. CrossSceneProgressDisplay.cs の作成
+
+別シーンでの進度表示を担う新しいスクリプトを作成しました。
+
+##### 主要機能
+1. **自動更新**: PlayerPrefsの変更を監視して表示を更新
+2. **UI要素管理**: Slider・Textの自動設定
+3. **リアルタイム同期**: 進度変更の即座な反映
+
+##### 設定項目
+```csharp
+[Header("UI要素設定")]
+public Slider[] progressSliders = new Slider[3];  // 各暗号方式のSlider
+public Text[] progressLabels = new Text[3];       // 各暗号方式のText
+
+[Header("更新設定")]
+public float updateInterval = 1.0f;               // 監視間隔
+public bool updateOnStart = true;                 // 起動時更新
+public bool updateOnApplicationFocus = true;      // フォーカス時更新
+```
+
+##### 自動更新メカニズム
+```csharp
+private IEnumerator PeriodicUpdateCoroutine()
+{
+    while (true)
+    {
+        yield return new WaitForSeconds(updateInterval);
+        
+        // 最終更新時刻をチェック
+        System.DateTime latestUpdateTime = ProgressTracker.GetLastUpdateTime();
+        if (latestUpdateTime > lastUpdateTime)
+        {
+            UpdateProgressDisplay();
+            lastUpdateTime = latestUpdateTime;
+        }
+    }
+}
+```
+
+### 使用方法
+
+#### Step 1: ProgressTrackerの設定
+1. ゲージがあるシーンのProgressTrackerで以下を有効化:
+   ```
+   Persist Across Scenes: ✓
+   Use Singleton Pattern: ✓
+   ```
+
+#### Step 2: リセットボタンの設定
+1. ボタンがあるシーンで `ProgressResetButton` コンポーネントを追加
+2. 以下を設定:
+   ```
+   Enable Cross Scene Operation: ✓
+   Cross Scene Mode: UseStaticMethods
+   ```
+
+#### Step 3: 別シーンでの表示
+1. ゲージ表示シーンで `CrossSceneProgressDisplay` コンポーネントを追加
+2. UI要素を設定:
+   ```
+   Progress Sliders: [SymmetricSlider, PublicSlider, HybridSlider]
+   Progress Labels: [SymmetricLabel, PublicLabel, HybridLabel]
+   ```
+
+### 動作フロー
+
+#### シーン間リセット
+```
+ボタンシーン → ProgressResetButton → 静的メソッド → 
+PlayerPrefs更新 → CrossSceneProgressDisplay → UI更新
+```
+
+#### データ同期方式
+1. **永続インスタンス**: DontDestroyOnLoadでProgressTrackerを保持
+2. **PlayerPrefs**: シーン間でのデータ永続化
+3. **タイムスタンプ**: 変更検出による効率的更新
+
+### 技術的利点
+
+1. **完全独立性**: シーン間での直接参照不要
+2. **自動同期**: リアルタイムでの進度更新
+3. **フォールバック**: 複数の通信方式で確実性向上
+4. **拡張性**: 新しいシーンでも簡単に対応
+
+### デバッグ機能
+
+- **Context Menu**: "Log Current Progress" で現在の進度確認
+- **詳細ログ**: 各操作の実行状況をログ出力
+- **設定確認**: 各コンポーネントの設定状況を確認
+
+この実装により、どのシーンからでも理解度ゲージの操作と表示が可能になり、マルチシーン構成でも一貫した学習進度管理を実現しました。

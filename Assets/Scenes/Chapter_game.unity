@@ -1626,7 +1626,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 800, y: 600}
+  m_SizeDelta: {x: 600, y: 450}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &249740550
 MonoBehaviour:
@@ -1641,7 +1641,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
   m_Material: {fileID: 0}
-  m_Color: {r: 0, g: 0, b: 0, a: 1}
+  m_Color: {r: 0, g: 0, b: 0, a: 0.6666667}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -1950,7 +1950,6 @@ GameObject:
   m_Component:
   - component: {fileID: 359859146}
   - component: {fileID: 359859148}
-  - component: {fileID: 359859149}
   - component: {fileID: 359859147}
   m_Layer: 5
   m_Name: 'ProgressPanel '
@@ -2022,18 +2021,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 359859145}
   m_CullTransparentMesh: 1
---- !u!114 &359859149
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 359859145}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c9b63b5896f134b42a9c8c30df6461f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: GameScripts::CrossSceneProgressDisplay
 --- !u!1 &409176393
 GameObject:
   m_ObjectHideFlags: 0
@@ -2311,7 +2298,7 @@ MonoBehaviour:
   hoverMaterial: {fileID: 2100000, guid: 0072902ddae4a4d2d950d804894df940, type: 2}
   selectedMaterial: {fileID: 2100000, guid: c5a41174a3602401eb5000d39f21cc20, type: 2}
   textOffset: {x: 0, y: 1, z: 0.6}
-  textScale: {x: 0.1, y: 0.3, z: 0.2}
+  textScale: {x: 0.1, y: 0.1, z: 0.1}
   fontSize: 50
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
@@ -3428,7 +3415,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\"\u30CF\u30A4\u30D6\u30EA\u30C3\u30C8\u6697\u53F7\u65B9\u5F0F \""
+  m_Text: "\"\u30CF\u30A4\u30D6\u30EA\u30C3\u30C8\u9375 \""
 --- !u!222 &532619959
 CanvasRenderer:
   m_ObjectHideFlags: 0
@@ -3816,7 +3803,7 @@ MonoBehaviour:
   hoverMaterial: {fileID: 2100000, guid: 0072902ddae4a4d2d950d804894df940, type: 2}
   selectedMaterial: {fileID: 2100000, guid: c5a41174a3602401eb5000d39f21cc20, type: 2}
   textOffset: {x: 0, y: 1, z: 0.6}
-  textScale: {x: 0.1, y: 0.3, z: 0.2}
+  textScale: {x: 0.1, y: 0.1, z: 0.1}
   fontSize: 50
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
@@ -4799,8 +4786,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   gameSetDuration: 180
   questionsPerSet: 3
-  enableSymmetricKey: 1
-  enablePublicKey: 1
+  enableSymmetricKey: 0
+  enablePublicKey: 0
   enableHybrid: 1
   questionText: {fileID: 1633949100}
   progressText: {fileID: 900029165}
@@ -4830,7 +4817,6 @@ MonoBehaviour:
   - {fileID: 532619958}
   animationManager: {fileID: 819720816}
   player: {fileID: 0}
-  playerInput: {fileID: 0}
   resetSettings:
     resetType: 0
     customPosition: {x: 0, y: 1, z: -1}
@@ -4911,15 +4897,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxProgress: 100
-  correctAnswerIncrement: 8
-  incorrectAnswerDecrement: 3
-  setCompletionBonus: 5
-  streakBonus: 2
-  minimumProgress: 0
-  enableNaturalDecay: 0
-  naturalDecayRate: 1
-  persistAcrossScenes: 1
-  useSingletonPattern: 1
+  progressIncrement: 5
+  progressDecayRate: 0.1
 --- !u!114 &819720816
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -6217,7 +6196,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 1}
   m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: -300, y: -50}
+  m_AnchoredPosition: {x: -150, y: -50}
   m_SizeDelta: {x: 250, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1073791743
@@ -6653,7 +6632,7 @@ MonoBehaviour:
   hoverMaterial: {fileID: 2100000, guid: 0072902ddae4a4d2d950d804894df940, type: 2}
   selectedMaterial: {fileID: 2100000, guid: c5a41174a3602401eb5000d39f21cc20, type: 2}
   textOffset: {x: 0, y: 1, z: 0.6}
-  textScale: {x: 0.1, y: 0.3, z: 0.2}
+  textScale: {x: 0.1, y: 0.1, z: 0.1}
   fontSize: 50
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
@@ -7061,7 +7040,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 8944336655422409503, guid: f6d148d888ffbf54b9afe9936dfaec1f, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -12
+      value: -9
       objectReference: {fileID: 0}
     - target: {fileID: 8944336655422409503, guid: f6d148d888ffbf54b9afe9936dfaec1f, type: 3}
       propertyPath: m_LocalRotation.w
@@ -9382,7 +9361,7 @@ MonoBehaviour:
   hoverMaterial: {fileID: 2100000, guid: 0072902ddae4a4d2d950d804894df940, type: 2}
   selectedMaterial: {fileID: 2100000, guid: c5a41174a3602401eb5000d39f21cc20, type: 2}
   textOffset: {x: 0, y: 1, z: 0.6}
-  textScale: {x: 0.1, y: 0.3, z: 0.2}
+  textScale: {x: 0.1, y: 0.1, z: 0.1}
   fontSize: 50
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
@@ -10522,7 +10501,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\"\u5171\u901A\u9375\u6697\u53F7\u65B9\u5F0F\""
+  m_Text: "\"\u5171\u901A\u9375 \""
 --- !u!1 &1881132719
 GameObject:
   m_ObjectHideFlags: 0
@@ -11235,7 +11214,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\"\u516C\u958B\u9375 \u6697\u53F7\u65B9\u5F0F\""
+  m_Text: "\"\u516C\u958B\u9375 \""
 --- !u!1 &2021540129
 GameObject:
   m_ObjectHideFlags: 0

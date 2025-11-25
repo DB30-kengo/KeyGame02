@@ -28,6 +28,20 @@ public class MessageDisplay : MonoBehaviour
     [Tooltip("敵に触れられた時のメッセージ")]
     public string caughtByEnemyMessage = "データを盗まれた";
     
+    [Header("ゲーム連携設定")]
+    [Tooltip("敵に捕まった時にゲージを減少させるか")]
+    public bool enableProgressDecrease = true;
+    
+    [Tooltip("ゲージ減少を通知するCryptoGameManager")]
+    public CryptoGameManager gameManager;
+    
+    [Tooltip("敵に捕まった時にプレイヤー移動を一時停止するか")]
+    public bool disableMovementOnCaught = true;
+    
+    [Tooltip("移動停止時間（秒）")]
+    [Range(0.5f, 5.0f)]
+    public float movementDisableDuration = 2.0f;
+    
     // 追加メッセージ用の辞書
     private Dictionary<string, string> messageDict = new Dictionary<string, string>();
     
@@ -67,6 +81,16 @@ public class MessageDisplay : MonoBehaviour
         // 基本メッセージを辞書に追加
         messageDict.Add("start", startMessage);
         messageDict.Add("caught", caughtByEnemyMessage);
+        
+        // CryptoGameManagerの自動検索
+        if (gameManager == null)
+        {
+            gameManager = FindObjectOfType<CryptoGameManager>();
+            if (gameManager != null)
+            {
+                Debug.Log("[MessageDisplay] CryptoGameManagerを自動検出しました");
+            }
+        }
     }
     
     private void Start()
@@ -84,10 +108,111 @@ public class MessageDisplay : MonoBehaviour
         if (messageDict.TryGetValue(messageKey, out string message))
         {
             DisplayMessage(message);
+            
+            // 敵に捕まった場合の特別な処理
+            if (messageKey == "caught")
+            {
+                HandleEnemyCaught();
+            }
         }
         else
         {
             Debug.LogWarning($"MessageDisplay: キー '{messageKey}' に対応するメッセージが見つかりません。");
+        }
+    }
+    
+    /// <summary>
+    /// 敵に捕まった時の処理
+    /// </summary>
+    private void HandleEnemyCaught()
+    {
+        Debug.Log("[MessageDisplay] 敵に捕まった時の処理を実行");
+        
+        // プレイヤー移動を一時的に無効化
+        if (disableMovementOnCaught)
+        {
+            StartCoroutine(TemporarilyDisableMovement());
+        }
+        
+        if (enableProgressDecrease && gameManager != null)
+        {
+            // 不正解処理を実行してゲージを減少させる
+            gameManager.AddIncorrectAnswerScore();
+            Debug.Log("[MessageDisplay] ゲージ減少処理を実行しました");
+        }
+        else if (enableProgressDecrease)
+        {
+            Debug.LogWarning("[MessageDisplay] ゲージ減少が有効ですが、CryptoGameManagerが見つかりません");
+            
+            // フォールバック: ProgressTrackerに直接アクセス
+            if (ProgressTracker.Instance != null)
+            {
+                // CryptoGameManagerを再検索してみる
+                var foundGameManager = FindObjectOfType<CryptoGameManager>();
+                if (foundGameManager != null)
+                {
+                    gameManager = foundGameManager; // 次回用にキャッシュ
+                    
+                    // 現在のゲームタイプを取得
+                    var currentType = foundGameManager.CurrentCryptoType;
+                    if (currentType.HasValue)
+                    {
+                        ProgressTracker.Instance.OnIncorrectAnswer(currentType.Value);
+                        Debug.Log($"[MessageDisplay] ProgressTracker経由でゲージ減少処理を実行しました: {currentType.Value}");
+                    }
+                    else
+                    {
+                        // ゲームタイプが取得できない場合はデフォルト値を使用
+                        ProgressTracker.Instance.OnIncorrectAnswer(CryptoGameManager.CryptoType.SymmetricKey);
+                        Debug.Log("[MessageDisplay] ProgressTracker経由でゲージ減少処理を実行しました（デフォルト: SymmetricKey）");
+                    }
+                }
+                else
+                {
+                    // CryptoGameManagerが見つからない場合はデフォルト値でゲージ減少
+                    ProgressTracker.Instance.OnIncorrectAnswer(CryptoGameManager.CryptoType.SymmetricKey);
+                    Debug.Log("[MessageDisplay] CryptoGameManager未検出、デフォルト値でゲージ減少処理を実行");
+                }
+            }
+            else
+            {
+                Debug.LogError("[MessageDisplay] ProgressTrackerも見つかりません。ゲージ減少処理をスキップします。");
+            }
+        }
+    }
+    
+    /// <summary>
+    /// 一時的にプレイヤー移動を無効化
+    /// </summary>
+    private IEnumerator TemporarilyDisableMovement()
+    {
+        if (gameManager != null && gameManager.playerInput != null)
+        {
+            var playerInput = gameManager.playerInput;
+            bool wasEnabled = playerInput.IsInputEnabled();
+            
+            if (wasEnabled)
+            {
+                playerInput.SetInputEnabled(false);
+                Debug.Log($"[MessageDisplay] プレイヤー移動を{movementDisableDuration}秒間無効化");
+                
+                yield return new WaitForSeconds(movementDisableDuration);
+                
+                // ゲームが進行中の場合のみ入力を再有効化
+                if (gameManager.IsGameActive)
+                {
+                    playerInput.SetInputEnabled(true);
+                    Debug.Log("[MessageDisplay] プレイヤー移動を再有効化");
+                }
+                else
+                {
+                    Debug.Log("[MessageDisplay] ゲーム終了のため、プレイヤー移動は無効のまま");
+                }
+            }
+        }
+        else
+        {
+            Debug.LogWarning("[MessageDisplay] プレイヤー入力コンポーネントが見つかりません。移動無効化をスキップします。");
         }
     }
     

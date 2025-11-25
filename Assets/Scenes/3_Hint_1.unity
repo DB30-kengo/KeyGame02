@@ -317,6 +317,7 @@ GameObject:
   - component: {fileID: 518712370}
   - component: {fileID: 518712373}
   - component: {fileID: 518712372}
+  - component: {fileID: 518712374}
   - component: {fileID: 518712371}
   m_Layer: 5
   m_Name: Button (hint2)
@@ -427,6 +428,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 518712369}
   m_CullTransparentMesh: 1
+--- !u!114 &518712374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 518712369}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 4_Hint_1
+  useFadeTransition: 0
+  fadeTime: 1
+  targetButton: {fileID: 518712371}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &840326492
 GameObject:
   m_ObjectHideFlags: 0
@@ -827,6 +847,7 @@ GameObject:
   - component: {fileID: 1153023304}
   - component: {fileID: 1153023307}
   - component: {fileID: 1153023306}
+  - component: {fileID: 1153023308}
   - component: {fileID: 1153023305}
   m_Layer: 5
   m_Name: Button (next)
@@ -937,6 +958,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1153023303}
   m_CullTransparentMesh: 1
+--- !u!114 &1153023308
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1153023303}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 3_Hint_2
+  useFadeTransition: 0
+  fadeTime: 1
+  targetButton: {fileID: 1153023305}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &1210276197
 GameObject:
   m_ObjectHideFlags: 0
@@ -1069,6 +1109,7 @@ GameObject:
   - component: {fileID: 1211482899}
   - component: {fileID: 1211482902}
   - component: {fileID: 1211482901}
+  - component: {fileID: 1211482903}
   - component: {fileID: 1211482900}
   m_Layer: 5
   m_Name: Button (hint3)
@@ -1179,6 +1220,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1211482898}
   m_CullTransparentMesh: 1
+--- !u!114 &1211482903
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1211482898}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 5_Hint_1
+  useFadeTransition: 0
+  fadeTime: 1
+  targetButton: {fileID: 1211482900}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &1245377523
 GameObject:
   m_ObjectHideFlags: 0
@@ -1475,6 +1535,7 @@ GameObject:
   - component: {fileID: 1541712211}
   - component: {fileID: 1541712214}
   - component: {fileID: 1541712213}
+  - component: {fileID: 1541712215}
   - component: {fileID: 1541712212}
   m_Layer: 5
   m_Name: Button (Game Start)
@@ -1585,6 +1646,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1541712210}
   m_CullTransparentMesh: 1
+--- !u!114 &1541712215
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541712210}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 6_Play_Game
+  useFadeTransition: 1
+  fadeTime: 1
+  targetButton: {fileID: 1541712212}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &1553836486
 GameObject:
   m_ObjectHideFlags: 0

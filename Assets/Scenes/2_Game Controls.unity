@@ -237,6 +237,7 @@ GameObject:
   - component: {fileID: 283224022}
   - component: {fileID: 283224021}
   - component: {fileID: 283224020}
+  - component: {fileID: 283224023}
   m_Layer: 5
   m_Name: Button (hint) (3-1)
   m_TagString: Untagged
@@ -346,6 +347,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 283224018}
   m_CullTransparentMesh: 1
+--- !u!114 &283224023
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 283224018}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 3_Hint_1
+  useFadeTransition: 0
+  fadeTime: 1
+  targetButton: {fileID: 283224020}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &369928113
 GameObject:
   m_ObjectHideFlags: 0
@@ -953,6 +973,7 @@ GameObject:
   - component: {fileID: 1541712214}
   - component: {fileID: 1541712213}
   - component: {fileID: 1541712212}
+  - component: {fileID: 1541712215}
   m_Layer: 5
   m_Name: Button (play)
   m_TagString: Untagged
@@ -1062,6 +1083,25 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1541712210}
   m_CullTransparentMesh: 1
+--- !u!114 &1541712215
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1541712210}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1d729a0e3113a4265960594ff586437d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::SceneTransitionButton
+  targetSceneName: 6_Play_Game
+  useFadeTransition: 1
+  fadeTime: 1
+  targetButton: {fileID: 1541712212}
+  showConfirmationDialog: 0
+  confirmationMessage: "\u3053\u306E\u30B7\u30FC\u30F3\u306B\u79FB\u52D5\u3057\u307E\u3059\u304B\uFF1F"
+  enableDebugLog: 1
 --- !u!1 &1795460280
 GameObject:
   m_ObjectHideFlags: 0
@@ -1072,6 +1112,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1795460281}
   - component: {fileID: 1795460284}
+  - component: {fileID: 1795460285}
   - component: {fileID: 1795460283}
   - component: {fileID: 1795460282}
   m_Layer: 5
@@ -1183,6 +1224,30 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1795460280}
   m_CullTransparentMesh: 1
+--- !u!114 &1795460285
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1795460280}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bb68ee1106f7f4350b4a513ee892514f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: GameScripts::ProgressResetButton
+  resetButton: {fileID: 1795460282}
+  progressTracker: {fileID: 0}
+  enableCrossSceneOperation: 1
+  crossSceneMode: 0
+  showConfirmationDialog: 0
+  confirmationMessage: "\u7406\u89E3\u5EA6\u30B2\u30FC\u30B8\u3092\u30EA\u30BB\u30C3\u30C8\u3057\u307E\u3059\u304B\uFF1F\n\n\u3053\u306E\u64CD\u4F5C\u306F\u53D6\u308A\u6D88\u305B\u307E\u305B\u3093\u3002\n\u4ECA\u307E\u3067\u306E\u5B66\u7FD2\u9032\u5EA6\u304C\u5931\u308F\u308C\u307E\u3059\u3002"
+  enableVisualFeedback: 1
+  feedbackDisplayTime: 2
+  feedbackMessage: "\u2705 \u7406\u89E3\u5EA6\u30B2\u30FC\u30B8\u304C\u30EA\u30BB\u30C3\u30C8\u3055\u308C\u307E\u3057\u305F\uFF01"
+  feedbackText: {fileID: 0}
+  feedbackPanel: {fileID: 0}
+  enableDebugLog: 1
 --- !u!1 &1896702832
 GameObject:
   m_ObjectHideFlags: 0
