@@ -406,7 +406,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &21886210
 RectTransform:
   m_ObjectHideFlags: 0
@@ -440,7 +440,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 1, g: 1, b: 1, a: 0}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -4829,8 +4829,9 @@ MonoBehaviour:
   - {fileID: 2005906455}
   - {fileID: 532619958}
   animationManager: {fileID: 819720816}
-  player: {fileID: 0}
-  playerInput: {fileID: 0}
+  uiManager: {fileID: 819720814}
+  player: {fileID: 2072648990}
+  playerInput: {fileID: 1762682259}
   resetSettings:
     resetType: 0
     customPosition: {x: 0, y: 1, z: -1}
@@ -4843,8 +4844,12 @@ MonoBehaviour:
     heightOffset: 0
     forceHeightOffset: 0
   enableDebugFunctions: 0
+  showAnswerRandomizationDebug: 1
+  useFixedRandomSeed: 0
+  fixedRandomSeed: 12345
   progressAnimationDuration: 0.5
   progressIncreaseColor: {r: 0, g: 1, b: 0, a: 1}
+  incorrectTextColor: {r: 1, g: 0, b: 0, a: 1}
   progressNormalColor: {r: 1, g: 1, b: 1, a: 1}
   showUIStatus: 1
 --- !u!114 &819720813
@@ -4866,7 +4871,6 @@ MonoBehaviour:
   customTimerFontSize: 24
   mainCanvas: {fileID: 854910577}
   timerText: {fileID: 1407807659}
-  progressText: {fileID: 900029165}
   questionText: {fileID: 1633949100}
   answerButtons:
   - {fileID: 336431334}
@@ -4892,12 +4896,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 61baa10a78e9f4b8b80aa3236e182fc0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  scriptIsWorking: 1
   correctAnswerEffect: {fileID: 0}
   correctAnswerSound: {fileID: 0}
   incorrectAnswerSound: {fileID: 0}
+  resultText: {fileID: 1353749694}
+  progressText: {fileID: 900029165}
+  correctText: "\u6B63\u89E3!"
+  incorrectText: "\u4E0D\u6B63\u89E3..."
+  correctTextColor: {r: 1, g: 1, b: 1, a: 1}
+  incorrectTextColor: {r: 1, g: 1, b: 1, a: 1}
+  resultDisplayDuration: 3
   buttonScaleEffect: 1.2
   buttonEffectDuration: 0.2
   progressBarAnimationSpeed: 2
+  symmetricKeyColor: {r: 0, g: 0, b: 1, a: 1}
+  publicKeyColor: {r: 1, g: 0, b: 0, a: 1}
+  hybridColor: {r: 0, g: 1, b: 0, a: 1}
+  cryptoTypeAnimationDuration: 1.5
+  keyAnimationSpeed: 3
+  encryptionParticles: {fileID: 0}
+  decryptionParticles: {fileID: 0}
+  symmetricKeyObject: {fileID: 0}
+  publicKeyObject: {fileID: 0}
+  privateKeyObject: {fileID: 0}
+  dataCubeObject: {fileID: 0}
 --- !u!114 &819720815
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4938,65 +4961,8 @@ MonoBehaviour:
   publicKey: {fileID: 465731003}
   privateKey: {fileID: 979408775}
   sessionKey: {fileID: 2141348624}
-  conveyorDropPoint: {fileID: 0}
-  moveAnimationTime: 2
-  transformAnimationTime: 1
-  glowEffectTime: 1
-  animPositions:
-    areaAPosition: {x: -5, y: 3, z: 10}
-    areaBPosition: {x: 5, y: 3, z: 10}
-    keyCreationPositionA: {x: -5, y: 4, z: 10}
-    encryptionPositionA: {x: -5, y: 4, z: 10}
-    keyAppearPositionB: {x: 5, y: 4, z: 10}
-    decryptionPositionB: {x: 5, y: 4, z: 10}
-    keyPairCreationB: {x: 5, y: 4, z: 10}
-    publicKeyTransferMid: {x: 0, y: 4, z: 10}
-    publicEncryptPositionA: {x: -5, y: 4, z: 10}
-    hybridKeyEncryptA: {x: -5, y: 3, z: 10}
-    hybridDataEncryptA: {x: -5, y: 2.5, z: 10}
-    privateKeyDecryptB: {x: 5, y: 3, z: 10}
-    transferArcHeight: 3
-    transferDuration: 2
-    encryptDataPosition: {x: -5, y: 3, z: 10}
-    encryptKeyPosition: {x: -5, y: 4, z: 10}
-    secureTransferPosition: {x: -5, y: 4, z: 10}
-    arcHeight: 3
-    publicKeyShowPosition: {x: 4, y: 4, z: 10}
-    privateKeyShowPosition: {x: 6, y: 4, z: 10}
-    publicEncryptDataPosition: {x: 5, y: 3, z: 10}
-    publicEncryptKeyPosition: {x: 5, y: 4, z: 10}
-    publicKeyDistribute1: {x: -5, y: 3, z: 10}
-    publicKeyDistribute2: {x: 0, y: 5, z: 10}
-    publicKeyDistribute3: {x: 2, y: 5, z: 10}
-    privateDecryptPosition: {x: 5, y: 3, z: 10}
-    privateKeyHidePosition: {x: 5, y: 3, z: 10}
-    sessionEncryptDataPosition: {x: -5, y: 3, z: 10}
-    sessionEncryptKeyPosition: {x: 5, y: 3, z: 10}
-    sessionKeyEncryptPosition: {x: -5, y: 3, z: 10}
-    sessionKeyDecryptPosition: {x: 5, y: 3, z: 10}
-    finalDataPosition: {x: 5, y: 3, z: 10}
-  dataCubeStartPos: {x: -5, y: 3, z: 10}
-  symmetricKeyStartPos: {x: -3, y: 4, z: 10}
-  publicKeyStartPos: {x: -1, y: 4, z: 10}
-  privateKeyStartPos: {x: 1, y: 4, z: 10}
-  sessionKeyStartPos: {x: 3, y: 4, z: 10}
   glowMaterial: {fileID: 0}
   encryptedMaterial: {fileID: 0}
-  floatingLabelPrefab: {fileID: 0}
-  transferAreas:
-    senderArea: {fileID: 1191214337}
-    senderStagingArea: {fileID: 75157716}
-    receiverArea: {fileID: 1738990652}
-    receiverStagingArea: {fileID: 1929907670}
-    dataTransferPath: []
-    keyTransferPath: []
-    dataTransferDelay: 1
-    keyTransferDelay: 0.5
-    transferCompleteDelay: 2
-  areaA: {fileID: 0}
-  areaB: {fileID: 0}
-  privateKeyColor: {r: 1, g: 0, b: 0, a: 1}
-  publicKeyColor: {r: 0, g: 0, b: 1, a: 1}
   keyGenerationEffect: {fileID: 0}
   transferEffect: {fileID: 0}
 --- !u!1 &820694267
@@ -5653,7 +5619,7 @@ MonoBehaviour:
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: "\"\u554F\u984C 2/3 - \u516C\u958B\u9375\u6697\u53F7\u65B9\u5F0F\""
+  m_Text: ProgressText
 --- !u!1 &916712462 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2070925442191277755, guid: a1a802ecaf6775746bb2a929fb554ad8, type: 3}
@@ -5792,7 +5758,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!224 &990643432
 RectTransform:
   m_ObjectHideFlags: 0
@@ -5808,10 +5774,10 @@ RectTransform:
   - {fileID: 1278957762}
   m_Father: {fileID: 854910578}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_SizeDelta: {x: 1000, y: 300}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &990643433
 MonoBehaviour:
@@ -5826,7 +5792,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 1, g: 1, b: 1, a: 0.392}
+  m_Color: {r: 1, g: 0.92156863, b: 0.015686275, a: 0.6392157}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -7738,7 +7704,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 160, y: 30}
+  m_SizeDelta: {x: 1000, y: 1000}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1278957763
 CanvasRenderer:
@@ -7770,18 +7736,18 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 14
-    m_FontStyle: 0
+    m_FontSize: 35
+    m_FontStyle: 1
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 40
-    m_Alignment: 0
+    m_MinSize: 3
+    m_MaxSize: 50
+    m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: New Text
+  m_Text: "\u274C \u4E0D\u6B63\u89E3\n\n\u9078\u629E\u3057\u305F\u56DE\u7B54: \u300C\u53D7\u4FE1\u8005\u3060\u3051\u300D\n\n\u53D7\u4FE1\u8005\u3060\u3051\u3067\u306A\u304F\u3001\u540C\u3058\u9375\u3092\u6301\u3064\u4EBA\u306A\u3089\u8AAD\u3081\u307E\u3059"
 --- !u!1 &1279464356
 GameObject:
   m_ObjectHideFlags: 0
@@ -8294,7 +8260,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 0, y: 0}
+  m_AnchoredPosition: {x: 0, y: 300}
   m_SizeDelta: {x: 1000, y: 500}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!222 &1353749693
@@ -8318,7 +8284,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Material: {fileID: 0}
-  m_Color: {r: 0.19607843, g: 0.19607843, b: 0.19607843, a: 1}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_RaycastTarget: 1
   m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
   m_Maskable: 1
@@ -8327,18 +8293,18 @@ MonoBehaviour:
       m_Calls: []
   m_FontData:
     m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
-    m_FontSize: 35
+    m_FontSize: 90
     m_FontStyle: 0
     m_BestFit: 0
-    m_MinSize: 10
-    m_MaxSize: 40
+    m_MinSize: 0
+    m_MaxSize: 90
     m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
     m_HorizontalOverflow: 0
     m_VerticalOverflow: 0
     m_LineSpacing: 1
-  m_Text: New Text
+  m_Text: "\u6B63\u89E3"
 --- !u!1001 &1402827283
 PrefabInstance:
   m_ObjectHideFlags: 0

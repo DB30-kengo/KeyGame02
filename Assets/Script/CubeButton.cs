@@ -14,7 +14,7 @@ public class CubeButton : MonoBehaviour
     
     private void Start()
     {
-        gameManager = FindObjectOfType<CryptoGameManager>();
+        gameManager = Object.FindFirstObjectByType<CryptoGameManager>();
         cubeRenderer = GetComponent<Renderer>();
         
         // テキスト表示用の子オブジェクト作成
@@ -37,7 +37,7 @@ public class CubeButton : MonoBehaviour
             gameManager.OnAnswerSelected(buttonIndex);
             
             // ボタンエフェクト
-            var uiManager = FindObjectOfType<CryptoUIManager>();
+            var uiManager = Object.FindFirstObjectByType<CryptoUIManager>();
             if (uiManager != null)
             {
                 uiManager.AnimateButtonPress(null); // 3D用の別メソッドを作成可能

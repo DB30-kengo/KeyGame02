@@ -116,8 +116,8 @@ public class GameBuildUtility : MonoBehaviour
         Debug.Log("[GameBuildUtility] Checking game system integration...");
         
         // CryptoGameManagerの確認
-        CryptoGameManager gameManager = FindObjectOfType<CryptoGameManager>();
-        if (gameManager != null)
+        var manager = Object.FindFirstObjectByType<CryptoGameManager>();
+        if (manager != null)
         {
             Debug.Log("✓ CryptoGameManager found");
             Debug.Log("✓ Game is running in pure gameplay mode");
@@ -126,6 +126,28 @@ public class GameBuildUtility : MonoBehaviour
         else
         {
             Debug.Log("✗ CryptoGameManager not found in current scene");
+        }
+        
+        // CryptoUIManagerの確認
+        var uiManager = Object.FindFirstObjectByType<CryptoUIManager>();
+        if (uiManager != null)
+        {
+            Debug.Log("✓ CryptoUIManager found");
+        }
+        else
+        {
+            Debug.Log("✗ CryptoUIManager not found in current scene");
+        }
+        
+        // ProgressTrackerの確認
+        var progress = Object.FindFirstObjectByType<ProgressTracker>();
+        if (progress != null)
+        {
+            Debug.Log("✓ ProgressTracker found");
+        }
+        else
+        {
+            Debug.Log("✗ ProgressTracker not found in current scene");
         }
         
         // 現在の状態をログ出力

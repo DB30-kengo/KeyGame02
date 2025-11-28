@@ -15,7 +15,7 @@ public class CryptoGameManager : MonoBehaviour
     public int questionsPerSet = 3;
     
     [Header("暗号方式選択 - Crypto Type Selection")]
-    [Tooltip("出題する暗号方式を選択してください")]
+    [Tooltip("出題する暗号方式を選択してください（チェックを外すとその方式は出題されません）")]
     public bool enableSymmetricKey = true;  // 共通鍵暗号
     public bool enablePublicKey = true;     // 公開鍵暗号
     public bool enableHybrid = true;        // ハイブリッド暗号
@@ -24,7 +24,10 @@ public class CryptoGameManager : MonoBehaviour
     public Text questionText;
     public Text progressText;
     public Text timerText;
+    // 解説パネル本文（既存）
     public Text explanationText;
+    // 解説パネルヘッダー（1行目に「✅ 正解！」等を中央表示するための Text）
+    public Text explanationHeaderText;
     public GameObject explanationPanel;
     public Button[] answerButtons; // UIボタン用（オプション）
     public CryptoAnswerCube[] answerCubes; // 3D回答キューブ（メイン）
@@ -45,6 +48,10 @@ public class CryptoGameManager : MonoBehaviour
 
     [Header("3D Animation System")]
     public CryptoAnimationManager animationManager;
+    
+    [Header("UI Animation System")]
+    [Tooltip("UI アニメーション管理")]
+    public CryptoUIManager uiManager;
     
     [Header("Player Management")]
     [Tooltip("プレイヤーオブジェクト（正解時に位置をリセット）")]
@@ -205,12 +212,252 @@ public class CryptoGameManager : MonoBehaviour
         Debug.Log("デバッグ: スコアリセットテスト実行");
     }
 
+    /// <summary>
+    /// 正解時のスコア加算
+    /// </summary>
+    private void AddCorrectAnswerScore()
+    {
+        currentScore += pointsPerCorrect;
+        correctAnswers++;
+        totalQuestions++;
+        
+        UpdateScoreDisplay();
+        
+        Debug.Log("正解スコア加算: +" + pointsPerCorrect + "点 (総合: " + currentScore + "点)");
+    }
+    
+    /// <summary>
+    /// 不正解時のスコア減点
+    /// </summary>
+    private void AddIncorrectAnswerScore()
+    {
+        currentScore = Mathf.Max(0, currentScore + pointsPerIncorrect); // マイナスにならないように
+        totalQuestions++;
+        
+        UpdateScoreDisplay();
+        
+        Debug.Log("不正解スコア減点: " + pointsPerIncorrect + "点 (総合: " + currentScore + "点)");
+    }
+    
+    /// <summary>
+    /// スコア表示の更新
+    /// </summary>
+    private void UpdateScoreDisplay()
+    {
+        if (currentScoreText != null)
+        {
+            currentScoreText.text = "スコア: " + currentScore;
+        }
+    }
+    
+    /// <summary>
+    /// 最終スコアの表示とEnterキー待機
+    /// </summary>
+    private void ShowFinalScore()
+    {
+        // プレイヤー入力を無効化
+        DisablePlayerInput();
+        
+        if (finalResultPanel != null)
+        {
+            finalResultPanel.SetActive(true);
+        }
+        
+        // 最終スコア計算
+        float accuracy = totalQuestions > 0 ? (float)correctAnswers / totalQuestions * 100 : 0;
+        string grade = GetScoreGrade(accuracy);
+        
+        string finalMessage = "ゲーム終了！\n\n" +
+                             "正解数: " + correctAnswers + " / " + totalQuestions + "\n" +
+                             "正解率: " + accuracy.ToString("F1") + "%\n" +
+                             "最終スコア: " + currentScore + "点\n" +
+                             "評価: " + grade + "\n\n" +
+                             "Enterキーでゲームを再開";
+        
+        if (finalScoreText != null)
+        {
+            finalScoreText.text = finalMessage;
+        }
+        
+        // 結果表示パネルもアクティブに
+        if (resultPanel != null)
+        {
+            resultPanel.SetActive(true);
+            if (resultText != null)
+            {
+                resultText.text = finalMessage;
+            }
+        }
+        
+        Debug.Log("最終結果表示: " + correctAnswers + "/" + totalQuestions + " (正解率: " + accuracy.ToString("F1") + "%), スコア: " + currentScore);
+        
+        // Enterキー待機の開始
+        StartCoroutine(WaitForEnterToRestart());
+    }
+    
+    /// <summary>
+    /// スコアに基づく評価取得
+    /// </summary>
+    private string GetScoreGrade(float accuracy)
+    {
+        if (accuracy >= 95) return "S (完璧!)";
+        if (accuracy >= 80) return "A (優秀)";
+        if (accuracy >= 65) return "B (良好)";
+        if (accuracy >= 50) return "C (合格)";
+        return "D (要復習)";
+    }
+    
+    /// <summary>
+    /// Enterキー待機とゲーム再開
+    /// </summary>
+    private IEnumerator WaitForEnterToRestart()
+    {
+        while (!Input.GetKeyDown(KeyCode.Return) && !Input.GetKeyDown(KeyCode.KeypadEnter))
+        {
+            yield return null;
+        }
+        
+        Debug.Log("Enterキー押下 - ゲーム再開");
+        
+        // UI要素を非表示
+        if (finalResultPanel != null)
+            finalResultPanel.SetActive(false);
+        if (resultPanel != null)
+            resultPanel.SetActive(false);
+        
+        // スコアリセット
+        ResetGameScores();
+        
+        // プレイヤー入力を再開
+        EnablePlayerInput();
+        
+        // 新しいゲームセット開始
+        StartNewGameSet();
+    }
+    
+    /// <summary>
+    /// ゲームスコアのリセット
+    /// </summary>
+    private void ResetGameScores()
+    {
+        currentScore = 0;
+        correctAnswers = 0;
+        totalQuestions = 0;
+        currentQuestionIndex = 0;
+        currentStepIndex = 0;
+        
+        UpdateScoreDisplay();
+        
+        Debug.Log("ゲームスコアリセット完了");
+    }
+
+    /// <summary>
+    /// エディタ用：回答ランダム化のテスト
+    /// </summary>
+    [ContextMenu("Test Answer Randomization")]
+    public void TestAnswerRandomization()
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.Log("[TestAnswerRandomization] Play mode でのみ実行可能です");
+            return;
+        }
+        
+        Debug.Log("=== 回答ランダム化テスト開始 ===");
+        
+        // テスト用の問題データを作成
+        var testQuestion = new CryptoQuestion
+        {
+            questionText = "テスト問題：正しい暗号方式はどれですか？",
+            answers = new string[] { "AES", "RSA", "DES", "SHA" },
+            correctAnswerIndex = 0, // AESが正解
+            explanations = new string[] 
+            {
+                "✅ 正解！AESは現代的な共通鍵暗号です。",
+                "❌ RSAは公開鍵暗号です。",
+                "❌ DESは古い暗号方式です。",
+                "❌ SHAはハッシュ関数です。"
+            }
+        };
+
+        Debug.Log($"テスト問題: {testQuestion.questionText}");
+        Debug.Log($"元の回答順序: [{string.Join(", ", testQuestion.answers)}]");
+        Debug.Log($"正解: {testQuestion.answers[testQuestion.correctAnswerIndex]} (インデックス: {testQuestion.correctAnswerIndex})");
+
+        // 複数回ランダム化をテスト
+        bool originalDebugSetting = showAnswerRandomizationDebug;
+        showAnswerRandomizationDebug = true;
+        
+        for (int i = 0; i < 5; i++)
+        {
+            Debug.Log($"\n--- ランダム化テスト {i + 1} ---");
+            SetRandomizedAnswers(testQuestion);
+        }
+
+        showAnswerRandomizationDebug = originalDebugSetting;
+        Debug.Log("=== 回答ランダム化テスト完了 ===");
+    }
+    
+    /// <summary>
+    /// エディタ用：現在の回答配置状況を表示
+    /// </summary>
+    [ContextMenu("Show Current Answer Layout")]
+    public void ShowCurrentAnswerLayout()
+    {
+        if (!Application.isPlaying)
+        {
+            Debug.Log("[ShowCurrentAnswerLayout] Play mode でのみ実行可能です");
+            return;
+        }
+        
+        if (answerCubes == null || answerCubes.Length == 0)
+        {
+            Debug.LogWarning("回答キューブが設定されていません");
+            return;
+        }
+
+        Debug.Log("=== 現在の回答配置状況 ===");
+        
+        for (int i = 0; i < answerCubes.Length; i++)
+        {
+            if (answerCubes[i] != null)
+            {
+                string answerText = answerCubes[i].answerText;
+                int answerIndex = answerCubes[i].answerIndex;
+                Vector3 position = answerCubes[i].transform.position;
+                bool isActive = answerCubes[i].gameObject.activeSelf;
+                
+                Debug.Log($"キューブ {i}: 回答「{answerText}」(インデックス: {answerIndex}) - 位置: {position} - アクティブ: {isActive}");
+            }
+            else
+            {
+                Debug.LogWarning($"キューブ {i}: null");
+            }
+        }
+        
+        Debug.Log("=== 回答配置表示完了 ===");
+    }
+
+    [Header("デバッグ・テスト機能")]
+    [Space(10)]
+    [Tooltip("回答ランダム化のデバッグ情報を表示するか")]
+    public bool showAnswerRandomizationDebug = true;
+    
+    [Tooltip("各問題で同じランダムシードを使用するか（テスト用）")]
+    public bool useFixedRandomSeed = false;
+    
+    [Tooltip("固定ランダムシード値（テスト用）")]
+    public int fixedRandomSeed = 12345;
+
     [Header("Progress Animation Settings")]
     [Tooltip("進捗スライダーのアニメーション時間")]
     public float progressAnimationDuration = 0.5f;
     
     [Tooltip("進捗増加時の色（正解時）")]
     public Color progressIncreaseColor = Color.green;
+    
+    [Tooltip("不正解時のテキスト色")]
+    public Color incorrectTextColor = Color.red;
     
     [Tooltip("通常時の色")]
     public Color progressNormalColor = Color.white;
@@ -258,7 +505,7 @@ public class CryptoGameManager : MonoBehaviour
             animationManager = GetComponent<CryptoAnimationManager>();
             if (animationManager == null)
             {
-                animationManager = FindObjectOfType<CryptoAnimationManager>();
+                animationManager = UnityEngine.Object.FindFirstObjectByType<CryptoAnimationManager>();
             }
         }
         
@@ -284,7 +531,7 @@ public class CryptoGameManager : MonoBehaviour
                 else
                 {
                     // CharacterControllerコンポーネントがついているオブジェクトを検索
-                    CharacterController characterController = FindObjectOfType<CharacterController>();
+                    CharacterController characterController = UnityEngine.Object.FindFirstObjectByType<CharacterController>();
                     if (characterController != null)
                     {
                         player = characterController.transform;
@@ -314,7 +561,7 @@ public class CryptoGameManager : MonoBehaviour
             // まだ見つからない場合はシーン全体から検索
             if (playerInput == null)
             {
-                playerInput = FindObjectOfType<StarterAssets.StarterAssetsInputs>();
+                playerInput = UnityEngine.Object.FindFirstObjectByType<StarterAssets.StarterAssetsInputs>();
                 if (playerInput != null)
                 {
                     Debug.Log($"プレイヤー入力コンポーネントをシーンから検出しました: {playerInput.name}");
@@ -400,1964 +647,640 @@ public class CryptoGameManager : MonoBehaviour
     /// </summary>
     private void SetGameCursor()
     {
-        // UIボタンがある場合はカーソルを表示、3Dのみの場合は非表示
-        if (answerButtons != null && answerButtons.Length > 0)
-        {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
-        }
-        else
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+        Debug.Log("ゲーム用カーソル設定完了");
     }
-
-    private void Update()
+    
+    /// <summary>
+    /// 不足しているUI要素の自動検索
+    /// </summary>
+    private void AutoFindMissingUIElements()
     {
-        if (isGameActive)
+        // 解説パネルの検索
+        if (explanationPanel == null)
         {
-            gameTimer -= Time.deltaTime;
-            UpdateTimerDisplay();
-            
-            if (gameTimer <= 0)
+            GameObject foundPanel = GameObject.Find("ExplanationPanel");
+            if (foundPanel == null)
             {
-                EndGameSet();
+                foundPanel = GameObject.Find("Explanation Panel");
+            }
+            if (foundPanel == null)
+            {
+                foundPanel = GameObject.Find("Panel_Explanation");
+            }
+            
+            if (foundPanel != null)
+            {
+                explanationPanel = foundPanel;
+                Debug.Log($"解説パネルを自動検出: {foundPanel.name}");
+            }
+        }
+        
+        // 解説テキストの検索
+        if (explanationText == null)
+        {
+            // 既存の探索ロジック
+            Text foundText = UnityEngine.Object.FindObjectOfType<Text>();
+            if (foundText != null && (foundText.name.Contains("Explanation") || foundText.name.Contains("explanation")))
+            {
+                explanationText = foundText;
+                Debug.Log($"解説テキストを自動検出: {foundText.name}");
+            }
+        }
+
+        // 解説ヘッダーが未設定なら、解説パネル内をより確実に検索（"ExplanationHeader" 名を優先）
+        if (explanationHeaderText == null && explanationPanel != null)
+        {
+            Transform headerTf = explanationPanel.transform.Find("ExplanationHeader");
+            if (headerTf != null)
+            {
+                explanationHeaderText = headerTf.GetComponent<Text>();
+            }
+            else
+            {
+                // 子要素の Text を走査して "Header" を含むものを探す（柔軟検出）
+                foreach (var txt in explanationPanel.GetComponentsInChildren<Text>(true))
+                {
+                    if (txt != null && txt.name.IndexOf("Header", System.StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        explanationHeaderText = txt;
+                        break;
+                    }
+                }
+            }
+            if (explanationHeaderText != null)
+            {
+                Debug.Log($"解説ヘッダーを自動検出: {explanationHeaderText.name}");
+            }
+        }
+
+        // 問題テキストの検索
+        if (questionText == null)
+        {
+            GameObject questionObj = GameObject.Find("QuestionText");
+            if (questionObj == null)
+            {
+                questionObj = GameObject.Find("Question Text");
+            }
+            if (questionObj == null)
+            {
+                questionObj = GameObject.Find("Text_Question");
+            }
+            
+            if (questionObj != null)
+            {
+                questionText = questionObj.GetComponent<Text>();
+                if (questionText != null)
+                {
+                    Debug.Log($"問題テキストを自動検出: {questionObj.name}");
+                }
+            }
+        }
+        
+        // スコアテキストの検索
+        if (currentScoreText == null)
+        {
+            GameObject scoreObj = GameObject.Find("CurrentScoreText");
+            if (scoreObj == null)
+            {
+                scoreObj = GameObject.Find("Score Text");
+            }
+            if (scoreObj == null)
+            {
+                scoreObj = GameObject.Find("Text_Score");
+            }
+            
+            if (scoreObj != null)
+            {
+                currentScoreText = scoreObj.GetComponent<Text>();
+                if (currentScoreText != null)
+                {
+                    Debug.Log($"スコアテキストを自動検出: {scoreObj.name}");
+                }
             }
         }
     }
     
-    public void StartNewGameSet()
+    /// <summary>
+    /// 解説パネル設定の検証
+    /// </summary>
+    private IEnumerator ValidateExplanationPanelSetup()
     {
-        // 理解度ゲージを新しいゲーム用にリセット
-        if (progressTracker != null)
+        yield return new WaitForSeconds(0.1f);
+        
+        if (explanationPanel == null || explanationText == null)
         {
-            progressTracker.ResetProgressForNewGame();
-            Debug.Log("CryptoGameManager: 理解度ゲージをリセットしました");
+            Debug.LogWarning("解説パネル要素が不完全です。動的作成を実行します。");
+            yield return StartCoroutine(CreateExplanationPanelDynamically("初期化テスト"));
         }
         else
         {
-            Debug.LogWarning("CryptoGameManager: ProgressTrackerが見つかりません");
+            Debug.Log("解説パネル設定が完了しています。");
         }
-        
-        // 有効化された暗号方式を確認
-        List<CryptoType> availableTypes = GetEnabledCryptoTypes();
-        if (availableTypes.Count == 0)
+    }
+    
+    /// <summary>
+    /// 解説パネルの動的作成
+    /// </summary>
+    private IEnumerator CreateExplanationPanelDynamically(string initialText)
+    {
+        // 基本的な解説パネルを動的作成
+        if (explanationPanel == null)
         {
-            Debug.LogWarning("有効な暗号方式がありません。すべての暗号方式を有効化します。");
-            enableSymmetricKey = true;
-            enablePublicKey = true;
-            enableHybrid = true;
-            availableTypes = GetEnabledCryptoTypes();
+            GameObject canvas = GameObject.Find("Canvas");
+            if (canvas != null)
+            {
+                GameObject panel = new GameObject("ExplanationPanel");
+                // add RectTransform so UI children layout correctly
+                var panelRT = panel.AddComponent<RectTransform>();
+                panel.transform.SetParent(canvas.transform, false);
+                // optional background
+                var img = panel.AddComponent<UnityEngine.UI.Image>();
+                img.color = new Color(0f, 0f, 0f, 0.6f);
+                explanationPanel = panel;
+
+                Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+
+                // ---- ヘッダー Text を先に作成（中央表示、太字） ----
+                GameObject headerObj = new GameObject("ExplanationHeader");
+                headerObj.transform.SetParent(panel.transform, false);
+                explanationHeaderText = headerObj.AddComponent<Text>();
+                explanationHeaderText.text = ""; // 初期は空
+                explanationHeaderText.fontSize = 28;
+                explanationHeaderText.fontStyle = FontStyle.Bold;
+                explanationHeaderText.alignment = TextAnchor.MiddleCenter;
+                explanationHeaderText.color = Color.white;
+                if (defaultFont != null) explanationHeaderText.font = defaultFont;
+
+                // header RectTransform layout
+                RectTransform headerRT = explanationHeaderText.GetComponent<RectTransform>();
+                headerRT.anchorMin = new Vector2(0.5f, 1f);
+                headerRT.anchorMax = new Vector2(0.5f, 1f);
+                headerRT.pivot = new Vector2(0.5f, 1f);
+                headerRT.anchoredPosition = new Vector2(0f, -10f);
+                headerRT.sizeDelta = new Vector2(600f, 40f);
+
+                // ---- 本文 Text を作成（左寄せ） ----
+                GameObject textObj = new GameObject("ExplanationBody");
+                textObj.transform.SetParent(panel.transform, false);
+
+                explanationText = textObj.AddComponent<Text>();
+                explanationText.text = initialText;
+                explanationText.fontSize = 20;
+                explanationText.alignment = TextAnchor.UpperLeft;
+                explanationText.color = Color.white;
+                if (defaultFont != null)
+                {
+                    explanationText.font = defaultFont;
+                }
+
+                // body RectTransform layout: 横幅いっぱい、ヘッダー下に配置
+                RectTransform bodyRT = explanationText.GetComponent<RectTransform>();
+                bodyRT.anchorMin = new Vector2(0f, 1f);
+                bodyRT.anchorMax = new Vector2(1f, 1f);
+                bodyRT.pivot = new Vector2(0.5f, 1f);
+                bodyRT.anchoredPosition = new Vector2(0f, -60f);
+                bodyRT.sizeDelta = new Vector2(0f, 200f);
+
+                Debug.Log("解説パネル（ヘッダー＋本文）を動的作成しました");
+                yield return new WaitForSeconds(0.1f);
+            }
         }
+        else
+        {
+            // 既存パネルがあるがヘッダーがない場合は追加してレイアウトする
+            if (explanationHeaderText == null && explanationPanel != null)
+            {
+                GameObject headerObj = new GameObject("ExplanationHeader");
+                headerObj.transform.SetParent(explanationPanel.transform, false);
+                explanationHeaderText = headerObj.AddComponent<Text>();
+                explanationHeaderText.text = "";
+                explanationHeaderText.fontSize = 28;
+                explanationHeaderText.fontStyle = FontStyle.Bold;
+                explanationHeaderText.alignment = TextAnchor.MiddleCenter;
+                explanationHeaderText.color = Color.white;
+                Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+                if (defaultFont != null) explanationHeaderText.font = defaultFont;
+
+                RectTransform headerRT = explanationHeaderText.GetComponent<RectTransform>();
+                headerRT.anchorMin = new Vector2(0.5f, 1f);
+                headerRT.anchorMax = new Vector2(0.5f, 1f);
+                headerRT.pivot = new Vector2(0.5f, 1f);
+                headerRT.anchoredPosition = new Vector2(0f, -10f);
+                headerRT.sizeDelta = new Vector2(600f, 40f);
+
+                // 既存の explanationText がある場合は位置を下げる
+                if (explanationText != null)
+                {
+                    RectTransform bodyRT = explanationText.GetComponent<RectTransform>();
+                    if (bodyRT != null)
+                    {
+                        bodyRT.anchorMin = new Vector2(0f, 1f);
+                        bodyRT.anchorMax = new Vector2(1f, 1f);
+                        bodyRT.pivot = new Vector2(0.5f, 1f);
+                        bodyRT.anchoredPosition = new Vector2(0f, -60f);
+                        bodyRT.sizeDelta = new Vector2(0f, 200f);
+                    }
+                }
+
+                Debug.Log("既存解説パネルにヘッダーを追加しました");
+            }
+        }
+
+        yield return null;
+    }
+    
+    /// <summary>
+    /// 新しいゲームセットの開始
+    /// </summary>
+    public void StartNewGameSet()
+    {
+        Debug.Log("新しいゲームセット開始");
         
-        // questionsPerSetを有効な暗号方式数に合わせて調整
-        questionsPerSet = availableTypes.Count;
-        
-        // ランダムに暗号方式の順序を決定
-        currentGameSet = GenerateRandomCryptoSet();
+        // ゲーム状態のリセット
         currentQuestionIndex = 0;
         currentStepIndex = 0;
         gameTimer = gameSetDuration;
         isGameActive = true;
-        correctAnswers = 0;
-        totalQuestions = 0;
-        currentScore = 0;
         
-        // プレイヤー入力を有効化
-        EnablePlayerInput();
+        // ゲームセットの生成（暗号方式の組み合わせ）
+        GenerateGameSet();
         
-        // スコア表示の初期化
-        UpdateScoreDisplay();
-        
-        // 3Dオブジェクトをリセット
-        if (animationManager != null)
+        // 最初の問題開始
+        if (currentGameSet != null && currentGameSet.Length > 0)
         {
-            animationManager.ResetAllObjects();
+            StartCurrentQuestion();
         }
-        
-        Debug.Log($"[StartGame] ゲーム開始時の状態 - currentQuestionIndex: {currentQuestionIndex}, currentStepIndex: {currentStepIndex}");
-        
-        UpdateProgressDisplay();
-        StartCurrentQuestion();
+        else
+        {
+            Debug.LogError("ゲームセットの生成に失敗しました");
+        }
     }
     
-    private List<CryptoType> GetEnabledCryptoTypes()
-    {
-        List<CryptoType> types = new List<CryptoType>();
-        
-        if (enableSymmetricKey) types.Add(CryptoType.SymmetricKey);
-        if (enablePublicKey) types.Add(CryptoType.PublicKey);
-        if (enableHybrid) types.Add(CryptoType.Hybrid);
-        
-        return types;
-    }
-    
-    private CryptoType[] GenerateRandomCryptoSet()
+    /// <summary>
+    /// ゲームセットの生成（固定順序：共通鍵→公開鍵→ハイブリッド）
+    /// </summary>
+    private void GenerateGameSet()
     {
         List<CryptoType> orderedTypes = new List<CryptoType>();
         
-        // 固定順序で暗号方式を追加: 1.Symmetric → 2.Public Key → 3.Hybrid
+        // 固定順序で暗号方式を追加
         if (enableSymmetricKey) orderedTypes.Add(CryptoType.SymmetricKey);
         if (enablePublicKey) orderedTypes.Add(CryptoType.PublicKey);
         if (enableHybrid) orderedTypes.Add(CryptoType.Hybrid);
         
         if (orderedTypes.Count == 0)
         {
-            Debug.LogError("有効な暗号方式がありません！");
-            return new CryptoType[0];
+            Debug.LogError("有効な暗号方式が選択されていません");
+            return;
         }
         
-        Debug.Log($"固定順序で暗号方式を設定: {string.Join(" → ", orderedTypes)}");
-        return orderedTypes.ToArray();
+        // questionsPerSetまで順序通りに設定
+        currentGameSet = new CryptoType[questionsPerSet];
+        for (int i = 0; i < questionsPerSet; i++)
+        {
+            if (i < orderedTypes.Count)
+            {
+                currentGameSet[i] = orderedTypes[i];
+            }
+            else
+            {
+                // questionsPerSetが暗号方式数より多い場合はループ
+                currentGameSet[i] = orderedTypes[i % orderedTypes.Count];
+            }
+        }
+        
+        Debug.Log($"ゲームセット生成（固定順序): [{string.Join(", ", currentGameSet)}]");
     }
     
+    /// <summary>
+    /// 現在の問題開始
+    /// </summary>
     private void StartCurrentQuestion()
     {
-        Debug.Log($"[StartCurrentQuestion呼び出し] currentQuestionIndex: {currentQuestionIndex}, currentStepIndex: {currentStepIndex}, questionsPerSet: {questionsPerSet}");
-        
-        if (currentQuestionIndex >= questionsPerSet)
+        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length)
         {
-            EndGameSet();
+            Debug.Log("ゲームセット完了");
+            ShowFinalScore();
             return;
         }
-
+        
         CryptoType currentType = currentGameSet[currentQuestionIndex];
-        
-        Debug.Log($"[StartCurrentQuestion] 暗号タイプ: {currentType}, ステップ: {currentStepIndex}");
-        
-        // 1問目の場合は鍵を非表示にして問題のみ表示
-        // 2問目以降で初めて鍵を表示
-        if (animationManager != null)
+
+        // 公開鍵暗号方式 or ハイブリッド暗号方式の1問目開始前にリセット処理
+        if ((currentType == CryptoType.PublicKey || currentType == CryptoType.Hybrid) && currentStepIndex == 0 && animationManager != null)
         {
-            if (currentStepIndex == 0)
+            // DataCubeを(-5,3,10)に移動（ワールド座標で確実に移動）
+            if (animationManager.dataCube != null)
             {
-                // 1問目：鍵を非表示にする（暗号方式が変わった時の初期化）
-                Debug.Log($"暗号方式 {currentType} の1問目：鍵を非表示に設定");
-                animationManager.HideAllKeys();
+                animationManager.ForceSetDataCubePosition(new Vector3(-5f, 3f, 10f));
             }
-            else if (currentStepIndex == 1)
-            {
-                // 2問目：暗号方式に応じた鍵を表示
-                Debug.Log($"暗号方式 {currentType} の2問目：鍵を表示 (ステップ: {currentStepIndex})");
-                animationManager.ShowKeysForCryptoType(currentType);
-            }
-            // 3問目以降は鍵が既に表示されているので何もしない
+            // 全ての鍵を非表示
+            animationManager.HideAllKeys();
+            Debug.Log("公開鍵/ハイブリッド暗号方式1問目開始前: 全ての鍵を非表示");
         }
 
-        CryptoQuestion question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
+        var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
         
-        DisplayQuestion(question);
-        UpdateProgressText();
-        UpdateProgressDisplay(); // スライダーとラベルも更新
-    }
-    
-    private void DisplayQuestion(CryptoQuestion question)
-    {
         if (question == null)
         {
-            Debug.LogError("CryptoQuestion が null です");
+            Debug.LogError($"問題データが見つかりません: {currentType}, ステップ {currentStepIndex}");
             return;
         }
         
+        // UI更新
         if (questionText != null)
         {
             questionText.text = question.questionText;
         }
-        else
+        
+        // 暗号方式に応じたアニメーション再生
+        PlayCryptoTypeAnimation(currentType);
+        
+        // 回答キューブをランダム化して設定
+        SetRandomizedAnswers(question);
+        
+        Debug.Log($"問題開始: {currentType}, ステップ: {currentStepIndex}");
+    }
+    
+    /// <summary>
+    /// 暗号方式に応じたアニメーションを再生
+    /// </summary>
+    private void PlayCryptoTypeAnimation(CryptoType cryptoType)
+    {
+        // UIManagerを探索
+        if (uiManager == null)
         {
-            Debug.LogWarning("Question Text が割り当てられていません");
+            uiManager = UnityEngine.Object.FindFirstObjectByType<CryptoUIManager>();
         }
         
-        // 3D回答キューブの設定（優先）
-        if (answerCubes != null && answerCubes.Length >= 4)
+        if (uiManager != null)
         {
-            Debug.Log($"回答キューブ設定開始: {answerCubes.Length}個のキューブ");
+            // 質問テキストを対象としてアニメーション実行
+            Transform animationTarget = questionText?.transform;
+            uiManager.PlayCryptoTypeAnimation(cryptoType, animationTarget);
             
-            for (int i = 0; i < answerCubes.Length && i < question.answers.Length; i++)
-            {
-                if (answerCubes[i] != null)
-                {
-                    answerCubes[i].SetAnswerText(question.answers[i]);
-                    answerCubes[i].SetAnswerIndex(i);
-                    answerCubes[i].SetActive(true);
-                    Debug.Log($"キューブ {i} 設定完了: {question.answers[i]}");
-                }
-                else
-                {
-                    Debug.LogError($"Answer Cube {i} が null です");
-                }
-            }
-            
-            // 使用しないキューブを非表示
-            for (int i = question.answers.Length; i < answerCubes.Length; i++)
-            {
-                if (answerCubes[i] != null)
-                {
-                    answerCubes[i].SetActive(false);
-                }
-            }
-        }
-        // UIボタンの設定（フォールバック）
-        else if (answerButtons != null && answerButtons.Length >= 4)
-        {
-            Debug.Log("UIボタンを使用してフォールバック表示");
-            
-            for (int i = 0; i < answerButtons.Length; i++)
-            {
-                if (i < question.answers.Length)
-                {
-                    if (answerButtons[i] != null)
-                    {
-                        answerButtons[i].gameObject.SetActive(true);
-                        Text buttonText = answerButtons[i].GetComponentInChildren<Text>();
-                        if (buttonText != null)
-                        {
-                            buttonText.text = question.answers[i];
-                        }
-                        
-                        // クリックイベントを設定
-                        int answerIndex = i;
-                        answerButtons[i].onClick.RemoveAllListeners();
-                        answerButtons[i].onClick.AddListener(() => OnAnswerSelected(answerIndex));
-                    }
-                    else
-                    {
-                        Debug.LogError($"Answer Button {i} が null です");
-                    }
-                }
-                else
-                {
-                    if (answerButtons[i] != null)
-                    {
-                        answerButtons[i].gameObject.SetActive(false);
-                    }
-                }
-            }
+            Debug.Log($"[CryptoGameManager] {cryptoType} アニメーション再生開始");
         }
         else
         {
-            Debug.LogError("回答システムが設定されていません。Answer Cubes または Answer Buttons を設定してください。");
+            Debug.LogWarning("[CryptoGameManager] CryptoUIManagerが見つかりません。アニメーションをスキップします。");
         }
     }
     
-    public void OnAnswerSelected(int answerIndex)
+    /// <summary>
+    /// 不正解が選択された時の処理
+    /// </summary>
+    public void OnIncorrectAnswerSelected(int selectedAnswerIndex = -1)
     {
-        // ゲーム状態の詳細チェックとデバッグ情報
-        Debug.Log($"[ゲーム状態チェック] currentGameSet: {(currentGameSet != null ? "存在" : "null")}");
-        Debug.Log($"[ゲーム状態チェック] currentGameSet.Length: {(currentGameSet?.Length ?? 0)}");
-        Debug.Log($"[ゲーム状態チェック] currentQuestionIndex: {currentQuestionIndex}");
-        Debug.Log($"[ゲーム状態チェック] isGameActive: {isGameActive}");
-        
-        // ゲーム状態が無効な場合は強制初期化
-        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length || !isGameActive)
+        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length)
         {
-            Debug.LogWarning("ゲーム状態が無効です。強制的に初期化を実行します。");
-            
-            // 強制初期化
-            StartNewGameSet();
-            
-            // 初期化後も状態が無効な場合はエラー
-            if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length)
-            {
-                Debug.LogError("初期化後もゲーム状態が無効です。ゲーム設定を確認してください。");
-                return;
-            }
-        }
-        
-        CryptoType currentType = currentGameSet[currentQuestionIndex];
-        CryptoQuestion question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
-        
-        // 詳細なデバッグログを追加
-        Debug.Log($"[判定詳細] 暗号タイプ: {currentType}, ステップ: {currentStepIndex}");
-        Debug.Log($"[判定詳細] 回答選択: {answerIndex}, 正解: {question.correctAnswerIndex}");
-        Debug.Log($"[判定詳細] 選択された回答: {(answerIndex < question.answers.Length ? question.answers[answerIndex] : "範囲外")}");
-        Debug.Log($"[判定詳細] 正解の回答: {(question.correctAnswerIndex < question.answers.Length ? question.answers[question.correctAnswerIndex] : "範囲外")}");
-        
-        // 配列範囲チェックを追加
-        if (answerIndex < 0 || answerIndex >= question.answers.Length)
-        {
-            Debug.LogError($"無効な回答インデックス: {answerIndex}, 回答数: {question.answers.Length}");
+            Debug.LogError("OnIncorrectAnswerSelected: 無効なゲーム状態です");
             return;
         }
         
-        if (question.correctAnswerIndex < 0 || question.correctAnswerIndex >= question.answers.Length)
-        {
-            Debug.LogError($"無効な正解インデックス: {question.correctAnswerIndex}, 回答数: {question.answers.Length}");
-            return;
-        }
+        Debug.Log("不正解処理開始");
         
-        totalQuestions++;
-        
-        // 判定処理を明確に分離
-        bool isCorrect = (answerIndex == question.correctAnswerIndex);
-        Debug.Log($"[最終判定] 結果: {(isCorrect ? "正解" : "不正解")}");
-        
-        // スコア処理
-        if (isCorrect)
-        {
-            currentScore += pointsPerCorrect;
-            Debug.Log($"✅ 正解! スコア: {currentScore}点 (+{pointsPerCorrect}点)");
-        }
-        else
-        {
-            currentScore += pointsPerIncorrect; // pointsPerIncorrectは負の値
-            Debug.Log($"❌ 不正解! スコア: {currentScore}点 ({pointsPerIncorrect}点)");
-        }
-        
-        // スコア表示を更新
-        UpdateScoreDisplay();
-        // 即座にフィードバックを表示
-        if (questionText != null)
-        {
-            if (isCorrect)
-            {
-                questionText.text = "✅ 正解！";
-                questionText.color = Color.green;
-                
-                // 正解時：3D演出と転送システムを実行
-                if (animationManager != null)
-                {
-                    // アニメーションタイプに応じて適切なメソッドを呼び出し
-                    string animationType = question.animationType;
-                    
-                    if (animationType == "create_keypair_b")
-                    {
-                        // エリアBでの鍵ペア生成（公開鍵暗号方式の最初の問題）
-                        animationManager.CreateKeyPairAtB();
-                    }
-                    else
-                    {
-                        // 従来のアニメーション
-                        animationManager.PlayCorrectAnswerAnimation(question);
-                    }
-                    
-                    // 適切なタイミングで転送を実行
-                    StartCoroutine(DelayedTransferExecution(currentType, currentStepIndex));
-                }
-            }
-            else
-            {
-                questionText.text = "❌ 不正解";
-                questionText.color = Color.red;
-            }
-        }
-        
-        if (isCorrect)
-        {
-            correctAnswers++;
-            StartCoroutine(DelayedCorrectAnswer());
-        }
-        else
-        {
-            Debug.Log($"❌ 不正解 - answerIndex: {answerIndex}, 正解: {question.correctAnswerIndex}");
-            
-            // explanationsの配列範囲チェックを追加
-            string explanation = "";
-            
-            Debug.Log($"🔍 解説取得開始 - answerIndex: {answerIndex}");
-            Debug.Log($"   - question.explanations: {(question.explanations != null ? "存在" : "null")}");
-            Debug.Log($"   - explanations配列長: {(question.explanations?.Length ?? 0)}");
-            
-            if (question.explanations != null && answerIndex < question.explanations.Length)
-            {
-                explanation = question.explanations[answerIndex];
-                Debug.Log($"✅ 直接解説取得成功: '{explanation}'");
-                Debug.Log($"   - 解説長: {explanation?.Length ?? 0}");
-                Debug.Log($"   - 解説内容詳細: '{explanation}'");
-            }
-            else
-            {
-                Debug.Log($"⚠️ 直接解説取得失敗、フォールバックを使用");
-                
-                // フォールバック: 正解の解説を使用
-                if (question.explanations != null && question.correctAnswerIndex < question.explanations.Length)
-                {
-                    string correctExplanation = question.explanations[question.correctAnswerIndex];
-                    explanation = $"正解は「{question.answers[question.correctAnswerIndex]}」です。\n\n{correctExplanation}";
-                    Debug.Log($"📝 正解解説使用: '{explanation}'");
-                    Debug.Log($"   - 正解解説の元テキスト: '{correctExplanation}'");
-                }
-                else
-                {
-                    explanation = $"正解は「{question.answers[question.correctAnswerIndex]}」です。\n\nこの問題について再度考えてみましょう。";
-                    Debug.LogWarning($"⚠️ 解説が見つからないため、デフォルト解説使用");
-                }
-            }
-            
-            Debug.Log($"🎯 最終的な解説: '{explanation}'");
-            Debug.Log($"   - 最終解説長: {explanation?.Length ?? 0}");
-            Debug.Log($"   - 最終解説null確認: {explanation == null}");
-            
-            // 間違えた場合：ゲームがアクティブなら同じ問題を再出題
-            if (isGameActive)
-            {
-                StartCoroutine(RetryCurrentQuestion(explanation));
-            }
-            else
-            {
-                Debug.Log("ゲーム終了のため、RetryCurrentQuestionをスキップします");
-            }
-        }
-    }
-    
-    /// <summary>
-    /// アニメーション完了後に転送を実行
-    /// </summary>
-    private IEnumerator DelayedTransferExecution(CryptoType cryptoType, int stepIndex)
-    {
-        // アニメーション完了を待つ
-        yield return new WaitForSeconds(2f);
-        
-        // 転送システムを実行
-        if (animationManager != null)
-        {
-            animationManager.ExecuteCryptoTransfer(cryptoType, stepIndex);
-        }
-    }
-    
-    /// <summary>
-    /// コルーチンで結果を返すためのヘルパークラス
-    /// </summary>
-    public class CoroutineResult<T>
-    {
-        public T Result { get; set; }
-        public bool IsCompleted { get; set; }
-        
-        public CoroutineResult()
-        {
-            IsCompleted = false;
-        }
-    }
-
-    private IEnumerator RetryCurrentQuestion(string explanation)
-    {
-        Debug.Log($"[RetryCurrentQuestion] 開始 - currentQuestionIndex: {currentQuestionIndex}, currentStepIndex: {currentStepIndex}");
-        Debug.Log($"[RetryCurrentQuestion] 受け取った解説: '{explanation}'");
-        Debug.Log($"[RetryCurrentQuestion] 解説長: {explanation?.Length ?? 0}");
-        Debug.Log($"[RetryCurrentQuestion] 解説null確認: {explanation == null}");
-        
-        // ゲームが非アクティブな場合は静かに終了
-        if (!isGameActive)
-        {
-            Debug.Log("[RetryCurrentQuestion] ゲームが既に終了しているため、処理を中断します");
-            yield break;
-        }
-        
-        // ゲーム状態の詳細確認
-        bool gameStateValid = true;
-        string invalidReason = "";
-        
-        if (currentGameSet == null)
-        {
-            gameStateValid = false;
-            invalidReason = "currentGameSetがnull";
-        }
-        else if (currentQuestionIndex >= currentGameSet.Length)
-        {
-            gameStateValid = false;
-            invalidReason = $"currentQuestionIndex({currentQuestionIndex}) >= currentGameSet.Length({currentGameSet.Length})";
-        }
-        else if (currentQuestionIndex < 0)
-        {
-            gameStateValid = false;
-            invalidReason = $"currentQuestionIndex({currentQuestionIndex}) < 0";
-        }
-        else if (!isGameActive)
-        {
-            gameStateValid = false;
-            invalidReason = "ゲームが非アクティブ";
-        }
-        
-        if (!gameStateValid)
-        {
-            Debug.LogError($"RetryCurrentQuestion: 無効なゲーム状態 - {invalidReason}");
-            
-            // すべての問題が完了した場合
-            if (currentQuestionIndex >= currentGameSet?.Length)
-            {
-                Debug.Log("全問題完了のため、ゲーム終了処理を実行");
-                yield return StartCoroutine(EndGame());
-            }
-            else
-            {
-                Debug.Log("ゲーム状態をリセットしています...");
-                yield return StartCoroutine(ForceGameReset());
-            }
-            yield break;
-        }
-
-        // プレイヤーの位置をリセット（解説表示より先に実行）
-        StartCoroutine(ResetPlayerPosition(GetPlayerResetPosition()));
-        Debug.Log("プレイヤー位置リセット開始 - 解説表示前に実行");
-        
-        Debug.Log($"[解説表示開始] 解説内容: '{explanation}'");
-        
-        // キャンバス上の専用解説パネル表示を使用
-        yield return StartCoroutine(ShowExplanationOnCanvas(explanation));
-        
-        // UI色をリセット
-        if (questionText != null)
-        {
-            questionText.color = Color.white;
-        }
-        
-        // 再度安全性をチェックしてから問題を再表示
-        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length || currentQuestionIndex < 0)
-        {
-            Debug.LogError("問題再表示時にもゲーム状態が無効です。ゲームを再開始します。");
-            yield return StartCoroutine(ForceGameReset());
-            yield break;
-        }
-        
-        // 同じ問題を再表示（ステップを進めない）
+        // 現在の問題情報を取得
         CryptoType currentType = currentGameSet[currentQuestionIndex];
-        CryptoQuestion question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
+        var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
         
-        if (question == null)
+        if (question != null)
         {
-            Debug.LogError($"問題データが取得できません。CryptoType: {currentType}, StepIndex: {currentStepIndex}");
-            yield return StartCoroutine(ForceGameReset());
-            yield break;
+            // 解説パネル表示（選択された回答に対応する解説を表示）
+            ShowExplanationPanel(question, false, selectedAnswerIndex); // false = 不正解
         }
         
-        DisplayQuestion(question);
+        // 不正解表示
+        ShowResultMessage("❌ 不正解", incorrectTextColor);
         
-        Debug.Log("同じ問題を再出題 - プレイヤー位置もリセット");
-    }
-
-    /// <summary>
-    /// 解説パネルの存在を確保する
-    /// </summary>
-    private IEnumerator EnsureExplanationPanelExists()
-    {
-        Debug.Log("🔧 解説パネル存在確認開始");
-        
-        // 既存パネルの検索
-        if (explanationPanel == null)
+        // プレイヤー位置を即座にリセット
+        if (player != null)
         {
-            // 1. 名前による検索
-            GameObject panel = GameObject.Find("ExplanationPanel");
-            if (panel != null)
-            {
-                explanationPanel = panel;
-                Debug.Log("✅ ExplanationPanel を名前検索で発見");
-            }
-            else
-            {
-                // 2. タグによる検索
-                GameObject[] taggedPanels = GameObject.FindGameObjectsWithTag("UI");
-                foreach (GameObject obj in taggedPanels)
-                {                if (obj.name.Contains("Explanation") && obj.name.Contains("Panel"))
-                {
-                    explanationPanel = obj;
-                    Debug.Log($"✅ ExplanationPanel をタグ検索で発見: {obj.name}");
-                    break;
-                    }
-                }
-            }
+            ResetPlayerPosition();
+            Debug.Log("不正解時: プレイヤー位置をリセットしました");
         }
         
-        // 既存テキストの検索
-        if (explanationText == null)
+        // 不正解処理（ゲージ減少）
+        if (progressTracker != null)
         {
-            Debug.Log("🔍 ExplanationText の詳細検索開始");
-            
-            if (explanationPanel != null)
-            {
-                // パネルの子要素からテキストを検索
-                Text childText = explanationPanel.GetComponentInChildren<Text>();
-                if (childText != null)
-                {
-                    explanationText = childText;
-                    Debug.Log($"✅ ExplanationText をパネル子要素から発見: {childText.name}");
-                }
-                else
-                {
-                    Debug.LogWarning("⚠️ パネル内にTextコンポーネントが見つかりません");
-                    
-                    // パネルの全子要素を詳細確認
-                    Component[] allComponents = explanationPanel.GetComponentsInChildren<Component>();
-                    Debug.Log($"📋 パネル内の全コンポーネント数: {allComponents.Length}");
-                    foreach (Component comp in allComponents)
-                    {
-                        Debug.Log($"   - {comp.GetType().Name}: {comp.name}");
-                    }
-                }
-            }
-            
-            if (explanationText == null)
-            {
-                // シーン全体からテキストを検索
-                Text[] allTexts = FindObjectsOfType<Text>();
-                Debug.Log($"🔍 シーン内の全Textコンポーネント数: {allTexts.Length}");
-                
-                foreach (Text text in allTexts)
-                {
-                    Debug.Log($"   - Text発見: {text.name} (親: {(text.transform.parent?.name ?? "なし")})");
-                    
-                    if (text.name == "ExplanationText" || text.name.Contains("Explanation"))
-                    {
-                        explanationText = text;
-                        Debug.Log($"✅ ExplanationText をシーン検索で発見: {text.name}");
-                        break;
-                    }
-                }
-                
-                if (explanationText == null)
-                {
-                    Debug.LogWarning("⚠️ 適切なExplanationTextが見つかりません");
-                }
-            }
+            progressTracker.OnIncorrectAnswer(currentType);
+            Debug.Log("[OnIncorrectAnswerSelected] 進度減少処理完了: " + currentType);
         }
         
-        // UI要素が見つからない場合は動的作成
-        if (explanationPanel == null || explanationText == null)
-        {
-            Debug.Log("🔧 解説パネルが見つからないため動的作成を実行");
-            yield return StartCoroutine(CreateExplanationPanelDynamically("テスト解説"));
-            yield return new WaitForEndOfFrame(); // 作成完了待機
-        }
+        // スコア減点
+        AddIncorrectAnswerScore();
         
-        // 最終確認
-        Debug.Log($"✅ 解説パネル存在確認完了 - Panel: {(explanationPanel != null ? "存在" : "なし")}, Text: {(explanationText != null ? "存在" : "なし")}");
-    }
-
-    /// <summary>
-    /// 解説パネルを表示する
-    /// </summary>
-    private IEnumerator DisplayExplanationPanel(string explanation, CoroutineResult<bool> result)
-    {
-        Debug.Log($"[解説パネル表示] 開始: '{explanation}'");
-        
-        // パネルの状態を詳細確認
-        if (explanationPanel != null)
-        {
-            Debug.Log($"[パネル詳細] 名前: {explanationPanel.name}");
-            Debug.Log($"[パネル詳細] アクティブ: {explanationPanel.activeSelf}");
-            Debug.Log($"[パネル詳細] 階層内アクティブ: {explanationPanel.activeInHierarchy}");
-            Debug.Log($"[パネル詳細] 親: {(explanationPanel.transform.parent?.name ?? "なし")}");
-            
-            // RectTransform確認
-            RectTransform rectTransform = explanationPanel.GetComponent<RectTransform>();
-            if (rectTransform != null)
-            {
-                Debug.Log($"[パネル詳細] 位置: {rectTransform.position}");
-                Debug.Log($"[パネル詳細] サイズ: {rectTransform.sizeDelta}");
-                Debug.Log($"[パネル詳細] アンカー: {rectTransform.anchoredPosition}");
-            }
-        }
-        
-        // エラーハンドリングをする前に基本操作を実行
-        bool hasError = false;
-        string errorMessage = "";
-        
-        try
-        {
-            // テキスト設定
-            if (explanationText != null)
-            {
-                Debug.Log($"[テキスト詳細] 設定前のテキスト: '{explanationText.text}'");
-                Debug.Log($"[テキスト詳細] テキストコンポーネント名: {explanationText.name}");
-                Debug.Log($"[テキスト詳細] アクティブ: {explanationText.gameObject.activeSelf}");
-                Debug.Log($"[テキスト詳細] 階層内アクティブ: {explanationText.gameObject.activeInHierarchy}");
-                Debug.Log($"[テキスト詳細] 色: {explanationText.color}");
-                Debug.Log($"[テキスト詳細] フォントサイズ: {explanationText.fontSize}");
-                Debug.Log($"[テキスト詳細] 親: {(explanationText.transform.parent?.name ?? "なし")}");
-                
-                explanationText.text = explanation;
-                Debug.Log($"✅ 解説テキスト設定完了: '{explanation}'");
-                Debug.Log($"[テキスト確認] 設定後のテキスト: '{explanationText.text}'");
-                
-                // テキストの視認性を強化
-                explanationText.color = Color.white;
-                explanationText.fontSize = 28; // より大きなフォントサイズ
-                
-                // フォントを確実に設定
-                Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-                if (defaultFont != null)
-                {
-                    explanationText.font = defaultFont;
-                    Debug.Log("✅ デフォルトフォント明示的設定");
-                }
-                
-                // テキスト表示の強制更新
-                explanationText.enabled = false;
-                explanationText.enabled = true;
-                
-                Debug.Log($"✅ テキスト強化設定完了 - フォント: {(explanationText.font != null ? explanationText.font.name : "null")}");
-                
-                // RectTransform確認
-                RectTransform textRect = explanationText.GetComponent<RectTransform>();
-                if (textRect != null)
-                {
-                    Debug.Log($"[テキスト詳細] 位置: {textRect.position}");
-                    Debug.Log($"[テキスト詳細] サイズ: {textRect.sizeDelta}");
-                    Debug.Log($"[テキスト詳細] アンカー: {textRect.anchoredPosition}");
-                }
-            }
-            else
-            {
-                Debug.LogError("❌ explanationTextがnullです！");
-            }
-            
-            // Canvas順序を最前面に設定
-            Canvas explanationCanvas = explanationPanel.GetComponentInParent<Canvas>();
-            if (explanationCanvas != null)
-            {
-                explanationCanvas.sortingOrder = 1000;
-                Debug.Log("✅ Canvas順序を最前面に設定");
-            }
-            else
-            {
-                Debug.LogWarning("⚠️ 解説パネルのCanvasが見つかりません");
-            }
-            
-            // パネルをアクティブ化
-            explanationPanel.SetActive(true);
-            Debug.Log("✅ 解説パネルをアクティブ化");
-            
-            // テキストも明示的にアクティブ化
-            if (explanationText != null && explanationText.gameObject != explanationPanel)
-            {
-                explanationText.gameObject.SetActive(true);
-                Debug.Log("✅ 解説テキストもアクティブ化");
-            }
-        }
-        catch (System.Exception e)
-        {
-            hasError = true;
-            errorMessage = e.Message;
-        }
-        
-        if (hasError)
-        {
-            Debug.LogError($"❌ 解説パネル表示エラー: {errorMessage}");
-            result.Result = false;
-            result.IsCompleted = true;
-            yield break;
-        }
-        
-        // アクティブ化後の状態確認
-        yield return new WaitForEndOfFrame(); // UI更新待機
-        
-        Debug.Log($"[表示確認] パネルアクティブ: {explanationPanel.activeSelf}");
-        Debug.Log($"[表示確認] 階層内アクティブ: {explanationPanel.activeInHierarchy}");
-        
-        // テキストの状態詳細確認
-        if (explanationText != null)
-        {
-            Debug.Log($"[テキスト表示確認] テキスト内容: '{explanationText.text}'");
-            Debug.Log($"[テキスト表示確認] テキストアクティブ: {explanationText.gameObject.activeSelf}");
-            Debug.Log($"[テキスト表示確認] 階層内アクティブ: {explanationText.gameObject.activeInHierarchy}");
-            Debug.Log($"[テキスト表示確認] 色: {explanationText.color}");
-            Debug.Log($"[テキスト表示確認] アルファ値: {explanationText.color.a}");
-            Debug.Log($"[テキスト表示確認] フォントサイズ: {explanationText.fontSize}");
-            Debug.Log($"[テキスト表示確認] 有効状態: {explanationText.enabled}");
-            
-            // テキストが見えない場合の強制設定
-            if (explanationText.color.a < 1.0f || !explanationText.enabled)
-            {
-                explanationText.color = Color.white;
-                explanationText.enabled = true;
-                Debug.Log("🔧 テキストの視認性を強制修正");
-            }
-            
-            // 追加の視認性チェック
-            RectTransform textRect = explanationText.GetComponent<RectTransform>();
-            if (textRect != null)
-            {
-                Debug.Log($"[テキスト位置] localPosition: {textRect.localPosition}");
-                Debug.Log($"[テキスト位置] anchoredPosition: {textRect.anchoredPosition}");
-                Debug.Log($"[テキスト位置] sizeDelta: {textRect.sizeDelta}");
-                
-                // サイズが0の場合は修正
-                if (textRect.sizeDelta.x <= 0 || textRect.sizeDelta.y <= 0)
-                {
-                    textRect.sizeDelta = new Vector2(400, 200);
-                    Debug.Log("🔧 テキストサイズを修正");
-                }
-            }
-        }
-        
-        // 表示時間
-        Debug.Log("⏰ 解説表示中... 5秒間");
-        yield return new WaitForSeconds(5f);
-        
-        // パネルを非表示
-        try
-        {
-            explanationPanel.SetActive(false);
-            Debug.Log("✅ 解説パネル非表示化完了");
-            
-            // Canvas順序をリセット
-            Canvas explanationCanvas = explanationPanel.GetComponentInParent<Canvas>();
-            if (explanationCanvas != null)
-            {
-                explanationCanvas.sortingOrder = 0;
-            }
-            
-            result.Result = true;
-            result.IsCompleted = true;
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"❌ 解説パネル非表示エラー: {e.Message}");
-            result.Result = false;
-            result.IsCompleted = true;
-        }
-    }
-
-    /// <summary>
-    /// 解説表示のフォールバック処理
-    /// </summary>
-    private IEnumerator ShowExplanationFallback(string explanation)
-    {
-        Debug.Log("🔄 解説表示フォールバック開始");
-        
-        // 1. questionTextでの表示
-        if (questionText != null)
-        {
-            string originalText = questionText.text;
-            Color originalColor = questionText.color;
-            
-            questionText.text = $"📝 解説: {explanation}";
-            questionText.color = new Color(1f, 0.8f, 0.4f, 1f); // オレンジ色
-            
-            Debug.Log("📝 questionTextで解説表示中");
-            yield return new WaitForSeconds(5f);
-            
-            // 元に戻す
-            questionText.text = originalText;
-            questionText.color = originalColor;
-            
-            Debug.Log("✅ questionTextフォールバック完了");
-        }
-        else
-        {
-            // 2. 最後の手段：コンソールのみ
-            Debug.LogError($"📝 解説内容（表示手段なし）: {explanation}");
-            yield return new WaitForSeconds(3f);
-        }
-    }
-
-    /// <summary>
-    /// 解説パネルを動的に作成（改良版）
-    /// </summary>
-    private IEnumerator CreateExplanationPanelDynamically(string explanation)
-    {
-        Debug.Log("🔧 解説パネル動的作成開始（改良版）");
-        
-        // 1. 最適なCanvasを検索
-        Canvas mainCanvas = FindBestCanvas();
-        if (mainCanvas == null)
-        {
-            Debug.LogError("❌ 適切なCanvasが見つかりません");
-            yield break;
-        }
-        
-        Debug.Log($"✅ Canvas発見: {mainCanvas.name} (sortingOrder: {mainCanvas.sortingOrder})");
-        
-        // 2. 既存の解説パネルを削除（重複回避）
-        GameObject existingPanel = GameObject.Find("ExplanationPanel");
-        if (existingPanel != null)
-        {
-            Debug.Log("🗑️ 既存の解説パネルを削除");
-            Destroy(existingPanel);
-            yield return new WaitForEndOfFrame();
-        }
-        
-        // エラーハンドリング用フラグ
-        bool hasError = false;
-        string errorMessage = "";
-        
-        try
-        {
-            // 3. ExplanationPanelを作成
-            GameObject panelObj = new GameObject("ExplanationPanel");
-            panelObj.transform.SetParent(mainCanvas.transform, false);
-            
-            // 4. RectTransform設定（画面中央、適切なサイズ）
-            RectTransform panelRect = panelObj.AddComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.15f, 0.25f);  // より中央寄り
-            panelRect.anchorMax = new Vector2(0.85f, 0.75f);
-            panelRect.offsetMin = Vector2.zero;
-            panelRect.offsetMax = Vector2.zero;
-            
-            Debug.Log($"✅ パネル位置設定: anchorMin={panelRect.anchorMin}, anchorMax={panelRect.anchorMax}");
-            
-            // 5. 背景画像設定
-            UnityEngine.UI.Image panelImage = panelObj.AddComponent<UnityEngine.UI.Image>();
-            panelImage.color = new Color(0.1f, 0.1f, 0.2f, 0.95f); // ダークブルー系
-            
-            // 6. 視認性向上のための外枠
-            UnityEngine.UI.Outline outline = panelObj.AddComponent<UnityEngine.UI.Outline>();
-            outline.effectColor = Color.yellow;
-            outline.effectDistance = new Vector2(3, 3);
-            
-            // 7. 影効果追加
-            UnityEngine.UI.Shadow shadow = panelObj.AddComponent<UnityEngine.UI.Shadow>();
-            shadow.effectColor = new Color(0, 0, 0, 0.5f);
-            shadow.effectDistance = new Vector2(5, -5);
-            
-            Debug.Log("✅ パネル装飾設定完了");
-            
-            // 8. ExplanationTextを作成
-            GameObject textObj = new GameObject("ExplanationText");
-            textObj.transform.SetParent(panelObj.transform, false);
-            
-            // 9. テキスト用RectTransform設定
-            RectTransform textRect = textObj.AddComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(40f, 40f);  // 余白を広げる
-            textRect.offsetMax = new Vector2(-40f, -40f);
-            
-            // 10. Text コンポーネント設定
-            Text textComponent = textObj.AddComponent<Text>();
-            textComponent.text = explanation;
-            textComponent.fontSize = 28; // より大きなフォントサイズ
-            textComponent.color = Color.white;
-            textComponent.alignment = TextAnchor.MiddleCenter;
-            textComponent.lineSpacing = 1.3f;
-            textComponent.horizontalOverflow = HorizontalWrapMode.Wrap;
-            textComponent.verticalOverflow = VerticalWrapMode.Truncate;
-            
-            // 11. フォント設定（優先度順）
-            Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (defaultFont != null)
-            {
-                textComponent.font = defaultFont;
-                Debug.Log("✅ LegacyRuntimeフォント設定");
-            }
-            else
-            {
-                // Arial フォントを検索
-                Font arialFont = Resources.FindObjectsOfTypeAll<Font>()
-                    .FirstOrDefault(f => f.name.ToLower().Contains("arial"));
-                if (arialFont != null)
-                {
-                    textComponent.font = arialFont;
-                    Debug.Log($"✅ Arialフォント設定: {arialFont.name}");
-                }
-                else
-                {
-                    Debug.LogWarning("⚠️ 適切なフォントが見つかりません、デフォルトを使用");
-                }
-            }
-            
-            Debug.Log($"✅ テキストコンポーネント作成: '{textComponent.text}'");
-            Debug.Log($"   - 名前: {textComponent.name}");
-            Debug.Log($"   - フォント: {(textComponent.font != null ? textComponent.font.name : "null")}");
-            Debug.Log($"   - フォントサイズ: {textComponent.fontSize}");
-            Debug.Log($"   - 色: {textComponent.color}");
-            Debug.Log($"   - 親: {textComponent.transform.parent.name}");
-            
-            // 12. フォント設定（旧実装は削除）
-            // SetBestFont(textComponent); ← これをコメントアウト
-            
-            // 12. テキスト装飾
-            UnityEngine.UI.Outline textOutline = textObj.AddComponent<UnityEngine.UI.Outline>();
-            textOutline.effectColor = Color.black;
-            textOutline.effectDistance = new Vector2(2, 2);
-            
-            // 13. テキストが正しく表示されるかテスト
-            textComponent.text = "【テスト表示】このテキストが見えますか？";
-            Debug.Log($"✅ テスト用テキスト設定完了: '{textComponent.text}'");
-            
-            Debug.Log("✅ テキスト設定完了");
-            
-            // 14. 参照を設定
-            explanationPanel = panelObj;
-            explanationText = textComponent;
-            
-            Debug.Log($"🔗 参照設定完了:");
-            Debug.Log($"   - explanationPanel: {(explanationPanel != null ? explanationPanel.name : "null")}");
-            Debug.Log($"   - explanationText: {(explanationText != null ? explanationText.name : "null")}");
-            
-            // 15. Canvas順序を最前面に設定
-            mainCanvas.sortingOrder = 1000;
-            
-            // 16. テキストを元の解説内容に戻す
-            textComponent.text = explanation;
-            Debug.Log($"✅ 解説テキスト復元: '{explanation}'");
-            
-            // 17. 初期状態は非表示
-            explanationPanel.SetActive(false);
-        }
-        catch (System.Exception e)
-        {
-            hasError = true;
-            errorMessage = e.Message;
-        }
-        
-        if (hasError)
-        {
-            Debug.LogError($"❌ 解説パネル動的作成エラー: {errorMessage}");
-            yield break;
-        }
-        
-        // 16. 作成完了の検証
-        yield return new WaitForEndOfFrame(); // UI更新完了待機
-        
-        bool creationSuccess = (explanationPanel != null && explanationText != null);
-        Debug.Log($"✅ 解説パネル動的作成完了 - 成功: {creationSuccess}");
-        
-        if (creationSuccess)
-        {
-            Debug.Log($"📝 パネル詳細: {explanationPanel.name}, テキスト: {explanationText.name}");
-            Debug.Log($"📝 Canvas: {mainCanvas.name}, 親: {explanationPanel.transform.parent.name}");
-        }
-        else
-        {
-            Debug.LogError("❌ 解説パネル作成後の検証に失敗");
-        }
-    }
-    
-    /// <summary>
-    /// 最適なCanvasを検索
-    /// </summary>
-    private Canvas FindBestCanvas()
-    {
-        Canvas[] allCanvases = FindObjectsOfType<Canvas>();
-        
-        // 1. ScreenSpace-Overlayを優先
-        foreach (Canvas canvas in allCanvases)
-        {
-            if (canvas.renderMode == RenderMode.ScreenSpaceOverlay && canvas.gameObject.activeInHierarchy)
-            {
-                return canvas;
-            }
-        }
-        
-        // 2. アクティブなCanvasを検索
-        foreach (Canvas canvas in allCanvases)
-        {
-            if (canvas.gameObject.activeInHierarchy)
-            {
-                return canvas;
-            }
-        }
-        
-        // 3. 最初のCanvasを使用
-        if (allCanvases.Length > 0)
-        {
-            return allCanvases[0];
-        }
-        
-        return null;
-    }
-    
-    /// <summary>
-    /// 最適なフォントを設定
-    /// </summary>
-    private void SetBestFont(Text textComponent)
-    {
-        // 1. デフォルトフォントを試行
-        Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-        if (defaultFont != null)
-        {
-            textComponent.font = defaultFont;
-            Debug.Log("✅ デフォルトフォント設定");
-            return;
-        }
-        
-        // 2. Arialフォントを検索
-        Font[] allFonts = Resources.FindObjectsOfTypeAll<Font>();
-        foreach (Font font in allFonts)
-        {
-            if (font.name.Contains("Arial") || font.name.Contains("arial"))
-            {
-                textComponent.font = font;
-                Debug.Log($"✅ Arialフォント設定: {font.name}");
-                return;
-            }
-        }
-        
-        // 3. 最初に見つかったフォントを使用
-        if (allFonts.Length > 0)
-        {
-            textComponent.font = allFonts[0];
-            Debug.Log($"✅ 代替フォント設定: {allFonts[0].name}");
-        }
-        else
-        {
-            Debug.LogWarning("⚠️ フォントが見つかりませんでした");
-        }
-    }
-
-    /// <summary>
-    /// 解説パネル設定の検証
-    /// </summary>
-    private IEnumerator ValidateExplanationPanelSetup()
-    {
-        yield return new WaitForSeconds(0.5f); // UI初期化待機
-        
-        Debug.Log("🔍 解説パネル設定を検証中...");
-        
-        bool isValid = true;
-        
-        if (explanationPanel == null)
-        {
-            Debug.LogWarning("⚠️ ExplanationPanel が設定されていません");
-            isValid = false;
-        }
-        else
-        {
-            Debug.Log($"✅ ExplanationPanel 設定済み: {explanationPanel.name}");
-        }
-        
-        if (explanationText == null)
-        {
-            Debug.LogWarning("⚠️ ExplanationText が設定されていません");
-            isValid = false;
-        }
-        else
-        {
-            Debug.Log($"✅ ExplanationText 設定済み: {explanationText.name}");
-        }
-        
-        if (!isValid)
-        {
-            Debug.LogWarning("🔧 解説パネル要素が不完全です。動的作成を準備します。");
-            // 必要に応じて動的作成を実行
-            if (explanationPanel == null)
-            {
-                yield return StartCoroutine(CreateExplanationPanelDynamically("初期化テスト"));
-            }
-        }
-        else
-        {
-            Debug.Log("🎉 解説パネル設定は完璧です！");
-            
-            // 初期状態でパネルを非表示にする
-            if (explanationPanel != null)
-            {
-                explanationPanel.SetActive(false);
-            }
-        }
-    }
-
-    /// <summary>
-    /// ゲーム状態を強制的にリセットする
-    /// </summary>
-    private IEnumerator ForceGameReset()
-    {
-        Debug.Log("強制的にゲーム状態をリセット中...");
-        
-        // UI表示をクリア
-        if (questionText != null)
-        {
-            questionText.text = "ゲームを再開始しています...";
-            questionText.color = Color.white;
-        }
-        
-        // 回答キューブを非表示
-        if (answerCubes != null)
-        {
-            foreach (var cube in answerCubes)
-            {
-                if (cube != null)
-                    cube.SetActive(false);
-            }
-        }
-        
-        // UIボタンを非表示
-        if (answerButtons != null)
-        {
-            foreach (Button btn in answerButtons)
-            {
-                if (btn != null)
-                    btn.gameObject.SetActive(false);
-            }
-        }
-        
-        yield return new WaitForSeconds(1f);
-        
-        // ゲームを新たに開始
-        StartNewGameSet();
-    }
-    
-    private IEnumerator DelayedCorrectAnswer()
-    {
-        yield return new WaitForSeconds(1f); // フィードバック表示時間
-        
-        // UI色をリセット
-        if (questionText != null)
-        {
-            questionText.color = Color.white;
-        }
-        
-        OnCorrectAnswer();
-    }
-    
-    /// <summary>
-    /// プレイヤーの位置をリセットする（設定システム対応・CharacterController対応・床抜け防止・ThirdPersonController対応）
-    /// </summary>
-    /// <param name="targetPosition">リセット先の位置</param>
-    private IEnumerator ResetPlayerPosition(Vector3 targetPosition)
-    {
-        if (player == null)
-        {
-            Debug.LogWarning("プレイヤーオブジェクトが設定されていません");
-            yield break;
-        }
-
-        Debug.Log($"プレイヤーを {targetPosition} にリセット中...");
-
-        // 設定システムから詳細パラメータを取得
-        bool useGroundDetection = resetSettings?.useGroundDetection ?? true;
-        float groundDistance = resetSettings?.groundDetectionDistance ?? 20f;
-        float heightOffset = resetSettings?.heightOffset ?? 1.5f;
-        bool forceHeightOffset = resetSettings?.forceHeightOffset ?? false;
-        bool shouldResetRotation = resetSettings?.resetRotation ?? false;
-        Vector3 resetRotation = resetSettings?.resetRotationEuler ?? Vector3.zero;
-
-        // ThirdPersonControllerを一時的に無効化（CharacterController.Moveエラーを防ぐ）
-        MonoBehaviour targetController = null;
-        bool wasThirdPersonControllerEnabled = false;
-        
-        // StarterAssetsのThirdPersonControllerを検索して無効化
-        MonoBehaviour[] components = player.GetComponents<MonoBehaviour>();
-        
-        foreach (var component in components)
-        {
-            if (component.GetType().Name == "ThirdPersonController")
-            {
-                targetController = component;
-                wasThirdPersonControllerEnabled = component.enabled;
-                component.enabled = false;
-                Debug.Log("ThirdPersonControllerを一時的に無効化");
-                break;
-            }
-        }
-
-        // CharacterControllerがある場合の特別処理
-        CharacterController characterController = player.GetComponent<CharacterController>();
-        if (characterController != null)
-        {
-            Debug.Log("CharacterController検出 - 安全なリセット処理を実行");
-            
-            // CharacterControllerを一時的に無効化
-            characterController.enabled = false;
-            yield return new WaitForFixedUpdate(); // 物理更新を待つ
-            
-            // 地面検出を使用するかどうかで処理を分岐
-            Vector3 finalPosition = targetPosition;
-            
-            if (!useGroundDetection)
-            {
-                // 地面検出を使用しない場合：設定位置をそのまま使用
-                Debug.Log($"地面検出無効 - 設定位置をそのまま使用: {targetPosition}");
-                player.position = targetPosition;
-            }
-            else
-            {
-                // 地面検出を使用する場合：まず高めの位置に設定
-                Vector3 safeTargetPosition = targetPosition;
-                safeTargetPosition.y += heightOffset + 2f; // 安全マージンを追加
-                player.position = safeTargetPosition;
-                Debug.Log($"地面検出有効 - 一時的に高い位置に配置: {safeTargetPosition}");
-            }
-            
-            // 向きもリセットする場合
-            if (shouldResetRotation)
-            {
-                player.rotation = Quaternion.Euler(resetRotation);
-                Debug.Log($"プレイヤーの向きをリセット: {resetRotation}");
-            }
-            
-            yield return new WaitForFixedUpdate(); // 物理更新を待つ
-            
-            // CharacterControllerを再有効化
-            characterController.enabled = true;
-            yield return new WaitForFixedUpdate(); // 物理更新を待つ
-            
-            // 地面検出処理
-            if (useGroundDetection)
-            {
-                // 地面に向かってレイキャストして正確な地面位置を取得
-                RaycastHit hit;
-                Vector3 rayStart = player.position + Vector3.up * 5f; // 十分に高い位置から開始
-                
-                Debug.Log($"地面検出開始 - レイキャスト開始位置: {rayStart}, 検出距離: {groundDistance}m");
-                
-                if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance, ~0, QueryTriggerInteraction.Ignore))
-                {
-                    // 地面が見つかった場合、その位置に設定（CharacterControllerの高さを考慮）
-                    Vector3 groundPosition = hit.point;
-                    float controllerHeightOffset = characterController.height * 0.5f + characterController.skinWidth;
-                    groundPosition.y += controllerHeightOffset + heightOffset;
-                    
-                    // CharacterController.Moveを使用して安全に移動
-                    Vector3 moveVector = groundPosition - player.position;
-                    characterController.Move(moveVector);
-                    
-                    Debug.Log($"地面検出成功！最終配置位置: {groundPosition}");
-                }
-                else
-                {
-                    // 地面が見つからない場合の処理
-                    Debug.LogWarning($"地面が検出されませんでした（検出距離: {groundDistance}m）");
-                    
-                    if (forceHeightOffset)
-                    {
-                        // 強制オフセットが有効な場合、目標位置にオフセットを適用
-                        Vector3 offsetPosition = targetPosition;
-                        offsetPosition.y += heightOffset;
-                        Vector3 moveVector = offsetPosition - player.position;
-                        characterController.Move(moveVector);
-                        Debug.Log($"強制オフセット適用 - 最終位置: {offsetPosition}");
-                    }
-                    else
-                    {
-                        // 元の目標位置を使用
-                        Vector3 moveVector = targetPosition - player.position;
-                        characterController.Move(moveVector);
-                        Debug.Log($"目標位置をそのまま使用: {targetPosition}");
-                    }
-                }
-            }
-            
-            Debug.Log("CharacterController付きプレイヤーの位置リセット完了");
-        }
-        else
-        {
-            // Rigidbodyがある場合の処理
-            Rigidbody rb = player.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                Debug.Log("Rigidbody検出 - 物理リセット処理を実行");
-                
-                // 物理的な速度をリセット
-                rb.linearVelocity = Vector3.zero;
-                rb.angularVelocity = Vector3.zero;
-                
-                Vector3 finalRigidbodyPosition = targetPosition;
-                
-                // 地面検出処理
-                if (useGroundDetection)
-                {
-                    RaycastHit hit;
-                    Vector3 rayStart = targetPosition + Vector3.up * 10f;
-                    
-                    if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance, ~0, QueryTriggerInteraction.Ignore))
-                    {
-                        finalRigidbodyPosition = hit.point;
-                        finalRigidbodyPosition.y += heightOffset;
-                        Debug.Log($"Rigidbody地面検出成功 - 配置位置: {finalRigidbodyPosition}");
-                    }
-                    else if (forceHeightOffset)
-                    {
-                        finalRigidbodyPosition.y += heightOffset;
-                        Debug.Log($"Rigidbody強制オフセット適用: +{heightOffset}m");
-                    }
-                }
-                else if (forceHeightOffset)
-                {
-                    finalRigidbodyPosition.y += heightOffset;
-                    Debug.Log($"Rigidbody地面検出無効・オフセット適用: +{heightOffset}m");
-                }
-                
-                // 位置を設定
-                rb.MovePosition(finalRigidbodyPosition);
-                
-                // 向きもリセットする場合
-                if (shouldResetRotation)
-                {
-                    rb.MoveRotation(Quaternion.Euler(resetRotation));
-                    Debug.Log($"Rigidbodyプレイヤーの向きをリセット: {resetRotation}");
-                }
-                
-                Debug.Log($"Rigidbody付きプレイヤーの位置リセット完了 - 最終位置: {finalRigidbodyPosition}");
-            }
-            else
-            {
-                // 通常のTransformによる移動
-                Vector3 finalTransformPosition = targetPosition;
-                
-                // 地面検出処理
-                if (useGroundDetection)
-                {
-                    RaycastHit hit;
-                    Vector3 rayStart = targetPosition + Vector3.up * 10f;
-                    
-                    if (Physics.Raycast(rayStart, Vector3.down, out hit, groundDistance, ~0, QueryTriggerInteraction.Ignore))
-                    {
-                        finalTransformPosition = hit.point;
-                        finalTransformPosition.y += heightOffset;
-                        Debug.Log($"Transform地面検出成功 - 配置位置: {finalTransformPosition}");
-                    }
-                    else if (forceHeightOffset)
-                    {
-                        finalTransformPosition.y += heightOffset;
-                        Debug.Log($"Transform強制オフセット適用: +{heightOffset}m");
-                    }
-                }
-                else if (forceHeightOffset)
-                {
-                    finalTransformPosition.y += heightOffset;
-                    Debug.Log($"Transform地面検出無効・オフセット適用: +{heightOffset}m");
-                }
-                
-                player.position = finalTransformPosition;
-                
-                // 向きもリセットする場合
-                if (shouldResetRotation)
-                {
-                    player.rotation = Quaternion.Euler(resetRotation);
-                    Debug.Log($"Transformプレイヤーの向きをリセット: {resetRotation}");
-                }
-                
-                Debug.Log($"Transform直接操作でプレイヤーの位置リセット完了 - 最終位置: {finalTransformPosition}");
-            }
-        }
-
-        // ThirdPersonControllerを再有効化
-        if (targetController != null && wasThirdPersonControllerEnabled)
-        {
-            yield return new WaitForFixedUpdate(); // 物理更新を待つ
-            targetController.enabled = true;
-            Debug.Log("ThirdPersonControllerを再有効化");
-        }
-
-        // カメラとプレイヤーコントローラーが安定するまで待機
-        yield return new WaitForSeconds(0.2f);
-        
-        Debug.Log($"プレイヤーリセット完了 - 最終位置: {player.position}");
-    }
-
-    private void OnCorrectAnswer()
-    {
-        Debug.Log($"[OnCorrectAnswer開始] currentStepIndex: {currentStepIndex}, currentQuestionIndex: {currentQuestionIndex}");
-        
-        // 新しい進度システムで正解処理
-        CryptoType currentType = currentGameSet[currentQuestionIndex];
-        progressTracker.OnCorrectAnswer(currentType);
-        
-        // 進捗UI表示を即座に更新（アニメーション付き）
+        // 進度UI更新
         UpdateProgressDisplay();
         
-        // 次のステップまたは次の問題へ
-        currentStepIndex++;
-        Debug.Log($"[OnCorrectAnswer] currentStepIndex増加後: {currentStepIndex}");
+        // 不正解時の視覚効果
+        StartCoroutine(ShowIncorrectAnswerEffect(currentType));
         
-        // 進捗テキストを更新（currentStepIndex増加後）
-        UpdateProgressText();
-        
-        // 進捗詳細情報を表示（最新の進捗テキストの後）
-        ShowProgressDetails(currentType);
-        
-        // プレイヤーの位置をリセット（設定システムを使用）
-        StartCoroutine(ResetPlayerPosition(GetPlayerResetPosition()));
-        
-        if (currentStepIndex >= CryptoQuestionDatabase.GetStepCount(currentType))
-        {
-            // 次の暗号方式へ
-            currentQuestionIndex++;
-            currentStepIndex = 0;
-            Debug.Log($"[OnCorrectAnswer] 次の暗号方式へ移行 - currentQuestionIndex: {currentQuestionIndex}, currentStepIndex: {currentStepIndex}");
-            
-            if (currentQuestionIndex < questionsPerSet)
-            {
-                StartCoroutine(TransitionToNextCryptoType());
-            }
-            else
-            {
-                // セット完了処理
-                progressTracker.OnSetCompleted(currentType);
-                EndGameSet();
-            }
-        }
-        else
-        {
-            // 同じ暗号方式の次のステップへ
-            Debug.Log($"[OnCorrectAnswer] 同じ暗号方式の次のステップへ - currentStepIndex: {currentStepIndex}");
-            StartCoroutine(TransitionToNextQuestion());
-        }
-    }
-    
-    private IEnumerator TransitionToNextQuestion()
-    {
-        Debug.Log($"[TransitionToNextQuestion開始] currentStepIndex: {currentStepIndex}, currentQuestionIndex: {currentQuestionIndex}");
-        
-        questionText.text = "次の問題に進みます...";
-        
-        // 3D回答キューブを非表示
-        if (answerCubes != null)
-        {
-            foreach (var cube in answerCubes)
-            {
-                if (cube != null)
-                    cube.SetActive(false);
-            }
-        }
-        
-        // UIボタンを無効化
-        if (answerButtons != null)
-        {
-            foreach (Button btn in answerButtons)
-            {
-                btn.gameObject.SetActive(false);
-            }
-        }
-        
-        yield return new WaitForSeconds(1f);
-        
-        Debug.Log($"[TransitionToNextQuestion] StartCurrentQuestion()呼び出し前 - currentStepIndex: {currentStepIndex}");
-        StartCurrentQuestion();
-    }
-    
-    private IEnumerator TransitionToNextCryptoType()
-    {
-        questionText.text = "次の暗号方式に進みます...";
-        
-        // 3D回答キューブを非表示
-        if (answerCubes != null)
-        {
-            foreach (var cube in answerCubes)
-            {
-                if (cube != null)
-                    cube.SetActive(false);
-            }
-        }
-        
-        // UIボタンを無効化
-        if (answerButtons != null)
-        {
-            foreach (Button btn in answerButtons)
-            {
-                btn.gameObject.SetActive(false);
-            }
-        }
-        
-        // 3Dオブジェクトをリセット
-        if (animationManager != null)
-        {
-            animationManager.ResetAllObjects();
-        }
-        
-        yield return new WaitForSeconds(2f); // 少し長めに待機
-        
-        StartCurrentQuestion();
-    }
-    
-    private void EndGameSet()
-    {
-        isGameActive = false;
-        
-        // プレイヤー入力を無効化
-        DisablePlayerInput();
-        
-        ShowResults();
-    }
-    
-    private void ShowResults()
-    {
-        // ゲーム終了時は FinalResultPanel のみを表示し、resultPanel は使用しない
-        // resultPanel.SetActive(true);  // ← コメントアウト
-        
-        float accuracy = totalQuestions > 0 ? (float)correctAnswers / totalQuestions * 100f : 0f;
-        string evaluation = GetEvaluation(accuracy);
-        
-        // resultText は使用せず、FinalScoreText のみで表示
-        // resultText.text = $"セット完了！\n" +
-        //                  $"正解数: {correctAnswers}/{totalQuestions}\n" +
-        //                  $"正解率: {accuracy:F1}%\n" +
-        //                  $"最終スコア: {currentScore}点\n" +
-        //                  $"評価: {evaluation}";
-        
-        // 最終スコア表示のみ実行
-        ShowFinalScore();
-        
-        StartCoroutine(WaitForRestartInput());
+        // しばらく待ってから同じ問題を再表示
+        StartCoroutine(HandleIncorrectAnswerDelay());
     }
     
     /// <summary>
-    /// 最終スコア表示（Enterキー対応版）
+    /// 正解時の処理
     /// </summary>
-    private void ShowFinalScore()
+    private void OnCorrectAnswer(int selectedAnswerIndex = -1)
     {
-        if (finalResultPanel != null)
+        Debug.Log("正解処理開始");
+        
+        // 現在の問題情報を取得
+        if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
         {
-            finalResultPanel.SetActive(true);
+            CryptoType currentType = currentGameSet[currentQuestionIndex];
+            var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
             
-            float accuracy = totalQuestions > 0 ? (float)correctAnswers / totalQuestions * 100f : 0f;
-            string evaluation = GetEvaluation(accuracy);
-            
-            if (finalScoreText != null)
+            if (question != null)
             {
-                finalScoreText.text = $"ゲーム完了！\n\n" +
-                                    $"最終スコア: {currentScore}点\n" +
-                                    $"正解数: {correctAnswers}/{totalQuestions}\n" +
-                                    $"正答率: {accuracy:F1}%\n" +
-                                    $"評価: {evaluation}\n\n" +
-                                    $"✨ Enterキーでもう一度プレイ ✨";
-                
-                Debug.Log($"✅ 最終スコア表示完了 - スコア: {currentScore}点, 正答率: {accuracy:F1}%");
-            }
-            
-            // Canvas順序を最前面に設定
-            Canvas canvas = finalResultPanel.GetComponentInParent<Canvas>();
-            if (canvas != null)
-            {
-                canvas.sortingOrder = 1000;
+                // 解説パネル表示（正解の解説を表示）
+                ShowExplanationPanel(question, true, selectedAnswerIndex); // true = 正解
             }
         }
-        else
-        {
-            Debug.LogWarning("⚠️ FinalResultPanelが設定されていません");
-        }
-    }
-    
-    private string GetEvaluation(float accuracy)
-    {
-        if (accuracy >= 90f) return "⭐⭐⭐ Perfect!";
-        if (accuracy >= 70f) return "⭐⭐ Great!";
-        if (accuracy >= 50f) return "⭐ Good!";
-        return "Keep Learning!";
-    }
-    
-    // 進度表示更新のロック
-    private bool isUpdatingProgress = false;
-    
-    private void UpdateProgressDisplay()
-    {
-        if (progressTracker == null)
-        {
-            Debug.LogWarning("ProgressTracker が見つかりません");
-            return;
-        }
         
-        // 更新中の場合はスキップして重複を防ぐ
-        if (isUpdatingProgress)
+        // スコア加算
+        AddCorrectAnswerScore();
+        
+        // 進度更新
+        if (progressTracker != null && currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
         {
-            Debug.Log("[CryptoGameManager] 進度表示更新中のため、重複更新をスキップ");
-            return;
-        }
-        
-        isUpdatingProgress = true;
-        
-        try
-        {
-            float[] progressValues = progressTracker.GetAllProgress();
-            string[] cryptoNames = { "共通鍵", "公開鍵", "ハイブリッド" };
-            
-            Debug.Log($"[CryptoGameManager] 進度表示更新開始 - 値: [{string.Join(", ", progressValues.Select(v => v.ToString("F1")))}]");
-            
-            if (progressSliders != null && progressLabels != null)
-            {
-                for (int i = 0; i < progressSliders.Length && i < progressValues.Length; i++)
-                {
-                    if (progressSliders[i] != null)
-                    {
-                        // スライダーのmaxValueを確認してから適切な値を設定
-                        float targetValue;
-                        if (progressSliders[i].maxValue == 1f)
-                        {
-                            // maxValueが1の場合は100で割る
-                            targetValue = progressValues[i] / 100f;
-                        }
-                        else
-                        {
-                            // maxValueが100の場合はそのまま
-                            targetValue = progressValues[i];
-                        }
-                        
-                        Debug.Log($"[CryptoGameManager] スライダー[{i}] 目標値: {targetValue:F3} (元値: {progressValues[i]:F1}%, maxValue: {progressSliders[i].maxValue})");
-                        
-                        // 既存のアニメーションがある場合は停止
-                        if (sliderAnimations.ContainsKey(i))
-                        {
-                            StopCoroutine(sliderAnimations[i]);
-                        }
-                        
-                        // 新しいアニメーションを開始
-                        sliderAnimations[i] = StartCoroutine(AnimateProgressSlider(progressSliders[i], targetValue, i));
-                    }
-                    
-                    if (i < progressLabels.Length && progressLabels[i] != null)
-                    {
-                        progressLabels[i].text = $"{cryptoNames[i]} {progressValues[i]:F0}%";
-                    }
-                }
-            }
-            else
-            {
-                Debug.LogWarning("Progress Sliders または Progress Labels が割り当てられていません");
-            }
-        }
-        finally
-        {
-            // 少し遅らせてロックを解除（アニメーション開始後）
-            StartCoroutine(ReleaseLockAfterDelay());
-        }
-    }
-    
-    private IEnumerator ReleaseLockAfterDelay()
-    {
-        yield return new WaitForSeconds(0.1f); // アニメーション開始を待つ
-        isUpdatingProgress = false;
-        Debug.Log("[CryptoGameManager] 進度表示更新ロック解除");
-    }
-    
-    /// <summary>
-    /// 進捗スライダーをスムーズにアニメーション
-    /// </summary>
-    private IEnumerator AnimateProgressSlider(Slider slider, float targetValue, int index)
-    {
-        float startValue = slider.value;
-        float elapsedTime = 0f;
-        bool isIncreasing = targetValue > startValue;
-        
-        Debug.Log($"[CryptoGameManager] スライダー[{index}]アニメーション開始: {startValue:F3} -> {targetValue:F3} (maxValue: {slider.maxValue})");
-        
-        // 進捗増加時は色を変更
-        Image fillImage = slider.fillRect.GetComponent<Image>();
-        Color originalColor = fillImage.color;
-        
-        if (isIncreasing && fillImage != null)
-        {
-            fillImage.color = progressIncreaseColor;
+            CryptoType currentType = currentGameSet[currentQuestionIndex];
+            progressTracker.OnCorrectAnswer(currentType);
         }
         
         // アニメーション実行
-        while (elapsedTime < progressAnimationDuration)
+        if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
         {
-            float t = elapsedTime / progressAnimationDuration;
-            float easedT = Mathf.SmoothStep(0f, 1f, t); // スムーズなアニメーション
-            slider.value = Mathf.Lerp(startValue, targetValue, easedT);
+            CryptoType currentType = currentGameSet[currentQuestionIndex];
+            var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
             
-            elapsedTime += Time.deltaTime;
-            yield return null;
-        }
-        
-        // 最終値を設定
-        slider.value = targetValue;
-        
-        Debug.Log($"[CryptoGameManager] スライダー[{index}]アニメーション完了: 最終値 {slider.value:F3}");
-        
-        // 色を元に戻す（少し遅らせて）
-        if (isIncreasing && fillImage != null)
-        {
-            yield return new WaitForSeconds(0.2f);
-            
-            float colorElapsed = 0f;
-            float colorDuration = 0.3f;
-            
-            while (colorElapsed < colorDuration)
+            if (question != null && !string.IsNullOrEmpty(question.animationType))
             {
-                float t = colorElapsed / colorDuration;
-                fillImage.color = Color.Lerp(progressIncreaseColor, originalColor, t);
-                colorElapsed += Time.deltaTime;
-                yield return null;
+                Debug.Log("正解アニメーション実行: " + question.animationType);
+                PlayCorrectAnswerAnimation(currentType, question);
             }
-            
-            fillImage.color = originalColor;
         }
         
-        // アニメーション完了を記録
-        if (sliderAnimations.ContainsKey(index))
+        // 次のステップまたは次の問題へ
+        currentStepIndex++;
+        
+        // 現在の暗号方式の全問題をクリアしたか確認
+        if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
         {
-            sliderAnimations.Remove(index);
+            CryptoType currentType = currentGameSet[currentQuestionIndex];
+            int totalQuestions = CryptoQuestionDatabase.GetQuestionCount(currentType);
+            
+            if (currentStepIndex >= totalQuestions)
+            {
+                // 次の暗号方式へ
+                currentQuestionIndex++;
+                currentStepIndex = 0;
+                Debug.Log("暗号方式完了。次の方式へ移行: インデックス " + currentQuestionIndex);
+            }
         }
+        
+        // プレイヤー位置リセット
+        if (player != null)
+        {
+            ResetPlayerPosition();
+        }
+        
+        // 次の問題開始
+        StartCoroutine(StartNextQuestionDelay());
     }
     
-    private void UpdateProgressText()
+    /// <summary>
+    /// 解説パネルの表示
+    /// </summary>
+    /// <param name="question">問題データ</param>
+    /// <param name="isCorrect">正解かどうか</param>
+    /// <param name="selectedAnswerIndex">選択された回答のインデックス</param>
+    private void ShowExplanationPanel(CryptoQuestion question, bool isCorrect, int selectedAnswerIndex = -1)
     {
-        if (progressText != null && currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
+        if (explanationPanel == null || explanationText == null)
         {
-            string cryptoName = GetCryptoTypeName(currentGameSet[currentQuestionIndex]);
-            // 暗号方式別に問題数を取得して表示
-            int totalSteps = CryptoQuestionDatabase.GetStepCount(currentGameSet[currentQuestionIndex]);
-            
-            // 詳細デバッグログ（ProgressText用）
-            Debug.Log($"[ProgressText更新詳細]");
-            Debug.Log($"  currentQuestionIndex: {currentQuestionIndex}");
-            Debug.Log($"  currentStepIndex: {currentStepIndex}");
-            Debug.Log($"  cryptoName: {cryptoName}");
-            Debug.Log($"  totalSteps: {totalSteps}");
-            Debug.Log($"  計算結果: 問題 {currentStepIndex + 1}/{totalSteps} - {cryptoName}");
-            
-            progressText.text = $"問題 {currentStepIndex + 1}/{totalSteps} - {cryptoName}";
-            
-            Debug.Log($"[ProgressText更新完了] '{progressText.text}'");
+            Debug.LogWarning("解説パネルまたは解説テキストが設定されていません。動的作成を試行します。");
+            StartCoroutine(CreateExplanationPanelAndShow(question, isCorrect, selectedAnswerIndex));
+            return;
         }
-        else if (progressText == null)
+
+        // ヘッダー（中央）と本文（左寄せ）を分けて設定する
+        if (explanationHeaderText != null)
         {
-            Debug.LogWarning("Progress Text が割り当てられていません");
+            explanationHeaderText.gameObject.SetActive(true);
+            // 正解時は末尾に改行を入れてヘッダーの下に余白を作る
+            explanationHeaderText.text = isCorrect ? "✅ 正解！\n" : "❌ 不正解";
+            // 明示的に中央寄せ／太字を保証
+            explanationHeaderText.alignment = TextAnchor.MiddleCenter;
+            explanationHeaderText.fontStyle = FontStyle.Bold;
+            // ensure header is above body in hierarchy
+            explanationHeaderText.transform.SetAsLastSibling();
+        }
+
+        // 本文は選択回答＋解説のみ（GetExplanationBody を使用）
+        string body = GetExplanationBody(question, isCorrect, selectedAnswerIndex);
+        explanationText.text = body;
+        explanationText.gameObject.SetActive(true);
+
+        // パネルを表示
+        explanationPanel.SetActive(true);
+
+        Debug.Log("解説パネル表示: " + (isCorrect ? "正解" : "不正解") +
+                 (selectedAnswerIndex >= 0 ? " (選択回答: " + selectedAnswerIndex + ")" : ""));
+
+        // 一定時間後に非表示
+        StartCoroutine(HideExplanationPanelAfterDelay());
+    }
+    
+    /// <summary>
+    /// 解説パネルの動的作成と表示
+    /// </summary>
+    /// <param name="question">問題データ</param>
+    /// <param name="isCorrect">正解かどうか</param>
+    /// <param name="selectedAnswerIndex">選択された回答のインデックス</param>
+    private IEnumerator CreateExplanationPanelAndShow(CryptoQuestion question, bool isCorrect, int selectedAnswerIndex = -1)
+    {
+        yield return StartCoroutine(CreateExplanationPanelDynamically("作成中..."));
+        
+        if (explanationPanel != null && explanationText != null)
+        {
+            ShowExplanationPanel(question, isCorrect, selectedAnswerIndex);
         }
         else
         {
-            Debug.LogWarning($"UpdateProgressText: ゲーム状態無効 - currentGameSet: {(currentGameSet != null ? "存在" : "null")}, currentQuestionIndex: {currentQuestionIndex}");
-        }
-    }
-    
-    private void UpdateTimerDisplay()
-    {
-        if (timerText != null)
-        {
-            int minutes = Mathf.FloorToInt(gameTimer / 60f);
-            int seconds = Mathf.FloorToInt(gameTimer % 60f);
-            timerText.text = $"{minutes:00}:{seconds:00}";
-        }
-        else
-        {
-            Debug.LogWarning("Timer Text が割り当てられていません");
-        }
-    }
-    
-    private string GetCryptoTypeName(CryptoType type)
-    {
-        switch (type)
-        {
-            case CryptoType.SymmetricKey: return "共通鍵暗号";
-            case CryptoType.PublicKey: return "公開鍵暗号";
-            case CryptoType.Hybrid: return "ハイブリッド暗号";
-            default: return "Unknown";
+            Debug.LogError("解説パネルの動的作成に失敗しました");
         }
     }
     
     /// <summary>
-    /// 設定に基づいて実際の復帰位置を取得
+    /// 解説本文のみを返す（ヘッダーは ShowExplanationPanel 側で表示）
     /// </summary>
-    private Vector3 GetPlayerResetPosition()
+    private string GetExplanationBody(CryptoQuestion question, bool isCorrect, int selectedAnswerIndex = -1)
     {
-        if (resetSettings == null)
+        if (question == null)
         {
-            // デフォルト位置を返す
-            return new Vector3(0, 3, 5);
+            return isCorrect ? "よくできました！" : "もう一度チャレンジしてください。";
         }
-        
-        Vector3 basePosition;
-        
-        switch (resetSettings.resetType)
+
+        string explanation = "";
+
+        // 対応する解説テキストを選ぶ
+        if (selectedAnswerIndex >= 0 && question.explanations != null &&
+            selectedAnswerIndex < question.explanations.Length)
         {
-            case ResetPositionType.Custom:
-                basePosition = resetSettings.customPosition;
-                break;
-                
-            case ResetPositionType.Preset:
-                basePosition = GetPresetPosition(resetSettings.presetPosition);
-                break;
-                
-            case ResetPositionType.Transform:
-                if (resetSettings.referenceTransform != null)
-                {
-                    basePosition = resetSettings.referenceTransform.position;
-                }
-                else
-                {
-                    Debug.LogWarning("Reference Transform が設定されていません。カスタム位置を使用します。");
-                    basePosition = resetSettings.customPosition;
-                }
-                break;
-                
-            default:
-                basePosition = resetSettings.customPosition;
-                break;
+            explanation = question.explanations[selectedAnswerIndex];
         }
-        
-        // 高さオフセットを強制適用する場合
-        if (resetSettings.forceHeightOffset)
+        else if (isCorrect && question.explanations != null &&
+                 question.correctAnswerIndex >= 0 && question.correctAnswerIndex < question.explanations.Length)
         {
-            basePosition.y += resetSettings.heightOffset;
-            Debug.Log($"高さオフセットを強制適用: +{resetSettings.heightOffset}m (最終Y座標: {basePosition.y})");
+            explanation = question.explanations[question.correctAnswerIndex];
         }
-        
-        return basePosition;
+        else
+        {
+            explanation = isCorrect ? "よくできました！" : "もう一度チャレンジしてください。";
+        }
+
+        // 選択した回答を先頭に追加（あれば）
+        if (selectedAnswerIndex >= 0 && question.answers != null && selectedAnswerIndex < question.answers.Length)
+        {
+            string selectedAnswer = question.answers[selectedAnswerIndex];
+            return "選択した回答: 「" + selectedAnswer + "」\n\n" + explanation;
+        }
+
+        return explanation;
     }
     
     /// <summary>
-    /// プリセット位置を取得
+    /// 解説パネルを一定時間後に非表示
     /// </summary>
-    private Vector3 GetPresetPosition(PresetPosition preset)
+    private IEnumerator HideExplanationPanelAfterDelay()
     {
-        switch (preset)
+        yield return new WaitForSeconds(5f); // 5秒間表示
+        
+        if (explanationPanel != null)
         {
-            case PresetPosition.Center:
-                return new Vector3(0, 3, 5);
-            case PresetPosition.FarCenter:
-                return new Vector3(0, 3, 10);
-            case PresetPosition.LeftSide:
-                return new Vector3(-5, 3, 5);
-            case PresetPosition.RightSide:
-                return new Vector3(5, 3, 5);
-            case PresetPosition.HighCenter:
-                return new Vector3(0, 8, 5);
-            case PresetPosition.StartPosition:
-                return new Vector3(0, 1, 0);
-            default:
-                return new Vector3(0, 3, 5);
+            explanationPanel.SetActive(false);
+            Debug.Log("解説パネルを非表示にしました");
         }
     }
 
     /// <summary>
-    /// 手動で理解度をリセットする（デバッグ用）
+    /// 正解時のアニメーション再生
     /// </summary>
-    public void ManualResetProgress()
+    private void PlayCorrectAnswerAnimation(CryptoType cryptoType, CryptoQuestion question)
     {
-        if (progressTracker != null)
+        if (animationManager != null && !string.IsNullOrEmpty(question.animationType))
         {
-            progressTracker.ResetProgressForNewGame();
-            UpdateProgressDisplay(); // UI更新
-            Debug.Log("CryptoGameManager: 理解度を手動でリセットしました");
+            Debug.Log("3Dアニメーション再生: " + question.animationType);
+            animationManager.PlayCorrectAnswerAnimation(question);
         }
         else
         {
-            Debug.LogWarning("CryptoGameManager: ProgressTrackerが見つかりません");
-        }
-    }
-    
-    /// <summary>
-    /// スコア表示を更新
-    /// </summary>
-    private void UpdateScoreDisplay()
-    {
-        if (currentScoreText != null)
-        {
-            currentScoreText.text = $"スコア: {currentScore}点";
-        }
-    }
-    
-    /// <summary>
-    /// 正解時のスコア加算処理
-    /// </summary>
-    public void AddCorrectAnswerScore()
-    {
-        currentScore += pointsPerCorrect;
-        UpdateScoreDisplay();
-        Debug.Log($"正解！ +{pointsPerCorrect}点 (合計: {currentScore}点)");
-    }
-    
-    /// <summary>
-    /// 不正解時のスコア減点処理
-    /// </summary>
-    public void AddIncorrectAnswerScore()
-    {
-        currentScore += pointsPerIncorrect;
-        // スコアが負の数にならないように調整
-        if (currentScore < 0) currentScore = 0;
-        UpdateScoreDisplay();
-        Debug.Log($"不正解... {pointsPerIncorrect}点 (合計: {currentScore}点)");
-        
-        // 新しい進度システムで不正解処理
-        if (currentGameSet != null && currentQuestionIndex >= 0 && currentQuestionIndex < currentGameSet.Length)
-        {
-            CryptoType currentType = currentGameSet[currentQuestionIndex];
-            progressTracker.OnIncorrectAnswer(currentType);
-            
-            // 進捗UI表示を更新（減少アニメーション付き）
-            UpdateProgressDisplay();
-            
-            // 不正解時の特別な視覚効果
-            StartCoroutine(ShowIncorrectAnswerEffect(currentType));
-            
-            Debug.Log($"[CryptoGameManager] 不正解処理完了: {currentType}, ゲージが減少しました");
-        }
-        else
-        {
-            Debug.LogWarning("[CryptoGameManager] 不正解処理: 有効なゲーム状態ではありません");
+            Debug.LogWarning("AnimationManagerが未設定、またはアニメーションタイプが空です");
         }
     }
     
@@ -2366,1112 +1289,370 @@ public class CryptoGameManager : MonoBehaviour
     /// </summary>
     private IEnumerator ShowIncorrectAnswerEffect(CryptoType cryptoType)
     {
-        // プログレススライダーを一時的に赤色に変更
-        if (progressSliders != null)
-        {
-            int cryptoIndex = (int)cryptoType;
-            if (cryptoIndex >= 0 && cryptoIndex < progressSliders.Length && progressSliders[cryptoIndex] != null)
-            {
-                Image fillImage = progressSliders[cryptoIndex].fillRect?.GetComponent<Image>();
-                if (fillImage != null)
-                {
-                    Color originalColor = fillImage.color;
-                    Color errorColor = Color.red;
-                    
-                    // 赤色に変更
-                    fillImage.color = errorColor;
-                    
-                    // 0.5秒待機
-                    yield return new WaitForSeconds(0.5f);
-                    
-                    // 徐々に元の色に戻す
-                    float fadeTime = 0.5f;
-                    float elapsedTime = 0f;
-                    
-                    while (elapsedTime < fadeTime)
-                    {
-                        float t = elapsedTime / fadeTime;
-                        fillImage.color = Color.Lerp(errorColor, originalColor, t);
-                        elapsedTime += Time.deltaTime;
-                        yield return null;
-                    }
-                    
-                    fillImage.color = originalColor;
-                }
-            }
-        }
+        Debug.Log("不正解エフェクト表示: " + cryptoType);
         
-        // 進度ラベルに一時的にエラーメッセージを表示
-        if (progressLabels != null)
-        {
-            int cryptoIndex = (int)cryptoType;
-            if (cryptoIndex >= 0 && cryptoIndex < progressLabels.Length && progressLabels[cryptoIndex] != null)
-            {
-                string originalText = progressLabels[cryptoIndex].text;
-                Color originalTextColor = progressLabels[cryptoIndex].color;
-                
-                // 一時的にエラーメッセージを表示
-                progressLabels[cryptoIndex].text = $"{GetCryptoTypeName(cryptoType)}: ゲージ減少！";
-                progressLabels[cryptoIndex].color = Color.red;
-                
-                yield return new WaitForSeconds(1.5f);
-                
-                // 元のテキストに戻す
-                progressLabels[cryptoIndex].text = originalText;
-                progressLabels[cryptoIndex].color = originalTextColor;
-            }
-        }
+        // ここで視覚的なエフェクトを実装可能
+        // 例：画面の赤いフラッシュ、音響効果など
+        
+        yield return new WaitForSeconds(0.5f);
+        
+        Debug.Log("不正解エフェクト完了");
     }
     
     /// <summary>
-    /// 進捗の詳細情報を表示（正解時の追加情報）
+    /// 進度表示の更新
     /// </summary>
-    public void ShowProgressDetails(CryptoType cryptoType)
+    private void UpdateProgressDisplay()
     {
         if (progressTracker == null) return;
         
-        float progress = progressTracker.GetProgress(cryptoType);
-        int completedSteps = Mathf.RoundToInt(progress / 20f); // 20%刻みなので
-        int totalSteps = CryptoQuestionDatabase.GetStepCount(cryptoType);
-        
-        string cryptoName = GetCryptoTypeName(cryptoType);
-        string detailMessage = $"{cryptoName}: {completedSteps}/{totalSteps}問完了 ({progress:F0}%)";
-        
-        Debug.Log($"[進捗詳細] {detailMessage}");
-        
-        // UI上に短時間表示するフローティングメッセージ（オプション）
-        StartCoroutine(ShowFloatingProgressMessage(detailMessage));
-    }
-    
-    /// <summary>
-    /// 進捗メッセージをフローティング表示
-    /// </summary>
-    private IEnumerator ShowFloatingProgressMessage(string message)
-    {
-        // 既存のprogressTextを一時的に使用して詳細表示
-        if (progressText != null)
+        // 進度スライダーの更新
+        if (progressSliders != null && progressSliders.Length >= 3)
         {
-            Color originalColor = progressText.color;
-            
-            // 詳細情報を短時間表示
-            progressText.text = message;
-            progressText.color = progressIncreaseColor;
-            
-            yield return new WaitForSeconds(2f);
-            
-            // 最新の進捗情報を再計算して表示
-            UpdateProgressText();
-            progressText.color = originalColor;
-        }
-    }
-    
-    /// <summary>
-    /// すべての暗号方式の完了度をチェック
-    /// </summary>
-    public bool IsAllCryptoTypesCompleted()
-    {
-        if (progressTracker == null) return false;
-        
-        float[] progressValues = progressTracker.GetAllProgress();
-        
-        foreach (float progress in progressValues)
-        {
-            if (progress < 100f) return false;
+            progressSliders[0].value = progressTracker.GetProgress(CryptoType.SymmetricKey);
+            progressSliders[1].value = progressTracker.GetProgress(CryptoType.PublicKey);
+            progressSliders[2].value = progressTracker.GetProgress(CryptoType.Hybrid);
         }
         
-        return true;
-    }
-    
-    /// <summary>
-    /// 総合的な学習進捗を取得
-    /// </summary>
-    public float GetOverallLearningProgress()
-    {
-        if (progressTracker == null) return 0f;
+        // 進度ラベルの更新
+        if (progressLabels != null && progressLabels.Length >= 3)
+        {
+            progressLabels[0].text = "共通鍵暗号: " + progressTracker.GetProgress(CryptoType.SymmetricKey).ToString("F1") + "%";
+            progressLabels[1].text = "公開鍵暗号: " + progressTracker.GetProgress(CryptoType.PublicKey).ToString("F1") + "%";
+            progressLabels[2].text = "ハイブリッド暗号: " + progressTracker.GetProgress(CryptoType.Hybrid).ToString("F1") + "%";
+        }
         
-        return progressTracker.GetOverallProgress();
+        Debug.Log("進度表示更新完了");
     }
 
     /// <summary>
-    /// デバッグ用：進捗表示システムの総合テスト
+    /// 回答キューブにランダムな順序で回答を設定
     /// </summary>
-    [ContextMenu("Test Progress Animation System")]
-    public void TestProgressAnimationSystem()
+    /// <param name="question">設定する問題データ</param>
+    private void SetRandomizedAnswers(CryptoQuestion question)
     {
-        if (!enableDebugFunctions) return;
-        
-        StartCoroutine(TestProgressSequence());
-    }
-    
-    private IEnumerator TestProgressSequence()
-    {
-        Debug.Log("=== 進捗アニメーションシステムテスト開始 ===");
-        
-        // 1. リセット
-        if (progressTracker != null)
+        // 入力検証
+        if (question == null)
         {
-            progressTracker.ResetProgressForNewGame();
-            UpdateProgressDisplay();
+            Debug.LogError("[SetRandomizedAnswers] ❌ 問題データがnullです");
+            return;
         }
-        
-        yield return new WaitForSeconds(1f);
-        
-        // 2. 共通鍵暗号の進捗テスト
-        Debug.Log("共通鍵暗号の進捗テスト開始");
-        for (int i = 1; i <= 5; i++)
-        {
-            progressTracker.UpdateProgress(CryptoType.SymmetricKey, 20f);
-            UpdateProgressDisplay();
-            ShowProgressDetails(CryptoType.SymmetricKey);
-            yield return new WaitForSeconds(1.5f);
-        }
-        
-        yield return new WaitForSeconds(1f);
-        
-        // 3. 公開鍵暗号の進捗テスト
-        Debug.Log("公開鍵暗号の進捗テスト開始");
-        for (int i = 1; i <= 5; i++)
-        {
-            progressTracker.UpdateProgress(CryptoType.PublicKey, 20f);
-            UpdateProgressDisplay();
-            ShowProgressDetails(CryptoType.PublicKey);
-            yield return new WaitForSeconds(1.5f);
-        }
-        
-        yield return new WaitForSeconds(1f);
-        
-        // 4. ハイブリッド暗号の進捗テスト
-        Debug.Log("ハイブリッド暗号の進捗テスト開始");
-        for (int i = 1; i <= 5; i++)
-        {
-            progressTracker.UpdateProgress(CryptoType.Hybrid, 20f);
-            UpdateProgressDisplay();
-            ShowProgressDetails(CryptoType.Hybrid);
-            yield return new WaitForSeconds(1.5f);
-        }
-        
-        // 5. 完了チェック
-        bool allCompleted = IsAllCryptoTypesCompleted();
-        float overallProgress = GetOverallLearningProgress();
-        
-        Debug.Log($"=== テスト完了 ===");
-        Debug.Log($"全暗号方式完了: {allCompleted}");
-        Debug.Log($"総合進捗: {overallProgress:F1}%");
-    }
 
-    /// <summary>
-    /// デバッグ用：解説システムのテスト
-    /// </summary>
-    [ContextMenu("Test Explanation System")]
-    public void TestExplanationSystem()
-    {
-        if (!enableDebugFunctions) return;
-        
-        StartCoroutine(TestExplanationSequence());
-    }
-    
-    private IEnumerator TestExplanationSequence()
-    {
-        Debug.Log("=== 解説システムテスト開始 ===");
-        
-        // テスト用解説文
-        string[] testExplanations = {
-            "❌ テスト解説1: これは不正解の説明です。",
-            "✅ テスト解説2: これは正解の説明です。",
-            "❌ テスト解説3: 長い解説テストです。共通鍵暗号では送信者と受信者が同じ暗号鍵を使用して、データの暗号化と復号化を行います。この方式では鍵の配布が重要な課題となります。"
-        };
-        
-        foreach (string explanation in testExplanations)
+        if (question.answers == null || question.answers.Length == 0)
         {
-            Debug.Log($"解説テスト実行: {explanation}");
-            if (isGameActive)
+            Debug.LogError("[SetRandomizedAnswers] ❌ 回答データが無効です（null または空の配列）");
+            return;
+        }
+
+        if (question.correctAnswerIndex < 0 || question.correctAnswerIndex >= question.answers.Length)
+        {
+            Debug.LogError("[SetRandomizedAnswers] ❌ 正解インデックスが無効です: " + question.correctAnswerIndex + " (回答数: " + question.answers.Length + ")");
+            return;
+        }
+        
+        if (answerCubes == null)
+        {
+            Debug.LogError("[SetRandomizedAnswers] ❌ 回答キューブ配列がnullです");
+            return;
+        }
+
+        if (answerCubes.Length < question.answers.Length)
+        {
+            Debug.LogError("[SetRandomizedAnswers] ❌ 回答キューブが不足しています。必要: " + question.answers.Length + ", 利用可能: " + answerCubes.Length);
+            return;
+        }
+
+        // null チェック
+        int validCubeCount = 0;
+        for (int i = 0; i < question.answers.Length && i < answerCubes.Length; i++)
+        {
+            if (answerCubes[i] != null)
             {
-                yield return StartCoroutine(RetryCurrentQuestion(explanation));
-                yield return new WaitForSeconds(0.5f);
+                validCubeCount++;
+            }
+        }
+
+        if (validCubeCount < question.answers.Length)
+        {
+            Debug.LogError("[SetRandomizedAnswers] ❌ 有効な回答キューブが不足しています。必要: " + question.answers.Length + ", 有効: " + validCubeCount);
+            return;
+        }
+
+        if (showAnswerRandomizationDebug)
+        {
+            Debug.Log("[SetRandomizedAnswers] 🎯 回答ランダム化開始");
+            Debug.Log("[SetRandomizedAnswers] 問題: " + question.questionText);
+            Debug.Log("[SetRandomizedAnswers] 回答数: " + question.answers.Length + ", キューブ数: " + answerCubes.Length);
+        }
+        
+        // テスト用の固定シード設定
+        if (useFixedRandomSeed)
+        {
+            UnityEngine.Random.InitState(fixedRandomSeed);
+            if (showAnswerRandomizationDebug)
+            {
+                Debug.Log("[SetRandomizedAnswers] 🔧 固定シードを使用: " + fixedRandomSeed);
+            }
+        }
+        
+        // 回答の順序をランダム化するためのインデックス配列を作成
+        int[] answerIndices = new int[question.answers.Length];
+        for (int i = 0; i < answerIndices.Length; i++)
+        {
+            answerIndices[i] = i;
+        }
+        
+        // Fisher-Yates shuffle でランダム化
+        for (int i = answerIndices.Length - 1; i > 0; i--)
+        {
+            int randomIndex = UnityEngine.Random.Range(0, i + 1);
+            int temp = answerIndices[i];
+            answerIndices[i] = answerIndices[randomIndex];
+            answerIndices[randomIndex] = temp;
+        }
+        
+        if (showAnswerRandomizationDebug)
+        {
+            Debug.Log("[SetRandomizedAnswers] 回答順序: [" + string.Join(", ", answerIndices) + "]");
+            Debug.Log("[SetRandomizedAnswers] 元の回答リスト: [" + string.Join(", ", question.answers) + "]");
+            Debug.Log("[SetRandomizedAnswers] 正解インデックス: " + question.correctAnswerIndex + " (正解: '" + question.answers[question.correctAnswerIndex] + "')");
+        }
+        
+        // ランダム化された順序でキューブに回答を設定
+        int correctCubePosition = -1; // 正解が配置されたキューブの位置を記録
+        
+        for (int cubeIndex = 0; cubeIndex < question.answers.Length && cubeIndex < answerCubes.Length; cubeIndex++)
+        {
+            if (answerCubes[cubeIndex] != null)
+            {
+                int answerIndex = answerIndices[cubeIndex];
+                string answerText = question.answers[answerIndex];
+                bool isCorrect = (answerIndex == question.correctAnswerIndex);
+                
+                answerCubes[cubeIndex].SetAnswerText(answerText);
+                answerCubes[cubeIndex].SetAnswerIndex(answerIndex);
+                answerCubes[cubeIndex].SetActive(true);
+                
+                if (isCorrect)
+                {
+                    correctCubePosition = cubeIndex;
+                }
+                
+                if (showAnswerRandomizationDebug)
+                {
+                    Vector3 cubePos = answerCubes[cubeIndex].transform.position;
+                    Debug.Log("キューブ " + cubeIndex + " 設定完了: '" + answerText + "' (元インデックス: " + answerIndex + ") " + (isCorrect ? "✅正解" : "❌") + " - 位置: " + cubePos);
+                }
             }
             else
             {
-                Debug.Log("ゲーム非アクティブのため、解説テストをスキップします");
+                Debug.LogError("Answer Cube " + cubeIndex + " が null です");
+            }
+        }
+        
+        // 使用しないキューブを非表示
+        for (int i = question.answers.Length; i < answerCubes.Length; i++)
+        {
+            if (answerCubes[i] != null)
+            {
+                answerCubes[i].SetActive(false);
+                if (showAnswerRandomizationDebug)
+                {
+                    Debug.Log("キューブ " + i + " を非表示にしました");
+                }
+            }
+        }
+        
+        if (showAnswerRandomizationDebug)
+        {
+            string correctAnswerText = question.answers[question.correctAnswerIndex];
+            Debug.Log("[SetRandomizedAnswers] ✅ 回答ランダム化完了");
+            Debug.Log("[SetRandomizedAnswers] 正解: 「" + correctAnswerText + "」がキューブ " + correctCubePosition + " に配置されました");
+            Debug.Log("[SetRandomizedAnswers] プレイヤーは位置を覚えられません - 毎回ランダムです！");
+        }
+    }
+
+    /// <summary>
+    /// 結果メッセージの表示（正解・不正解）
+    /// </summary>
+    private void ShowResultMessage(string message, Color color)
+    {
+        // ResultText は UI 上で使わない運用に変更しました。
+        // 必要ならログ出力のみ行う（実際の表示は解説パネル側で行う）
+        Debug.Log($"結果メッセージ(非表示運用): {message}");
+    }
+    
+    /// <summary>
+    /// プレイヤー位置のリセット
+    /// </summary>
+    private void ResetPlayerPosition()
+    {
+        if (player == null)
+        {
+            Debug.LogWarning("プレイヤーオブジェクトが設定されていません");
+            return;
+        }
+        
+        Vector3 resetPos = resetSettings.customPosition;
+        
+        switch (resetSettings.resetType)
+        {
+            case ResetPositionType.Custom:
+                resetPos = resetSettings.customPosition;
                 break;
-            }
+            case ResetPositionType.Preset:
+                resetPos = GetPresetPosition(resetSettings.presetPosition);
+                break;
+            case ResetPositionType.Transform:
+                if (resetSettings.referenceTransform != null)
+                {
+                    resetPos = resetSettings.referenceTransform.position;
+                }
+                else
+                {
+                    Debug.LogWarning("参照Transformが設定されていません。カスタム位置を使用します");
+                    resetPos = resetSettings.customPosition;
+                }
+                break;
         }
         
-        Debug.Log("=== 解説システムテスト完了 ===");
-    }
-    
-    /// <summary>
-    /// デバッグ用：UI要素の状態確認
-    /// </summary>
-    [ContextMenu("Check UI Elements Status")]
-    public void CheckUIElementsStatus()
-    {
-        if (!enableDebugFunctions) return;
-        
-        Debug.Log("=== UI要素状態確認 ===");
-        Debug.Log($"questionText: {(questionText != null ? "✅設定済み" : "❌未設定")}");
-        Debug.Log($"explanationPanel: {(explanationPanel != null ? "✅設定済み" : "❌未設定")}");
-        Debug.Log($"explanationText: {(explanationText != null ? "✅設定済み" : "❌未設定")}");
-        Debug.Log($"currentScoreText: {(currentScoreText != null ? "✅設定済み" : "❌未設定")}");
-        Debug.Log($"finalResultPanel: {(finalResultPanel != null ? "✅設定済み" : "❌未設定")}");
-        
-        if (explanationPanel != null)
+        // 高さ調整
+        if (resetSettings.useGroundDetection)
         {
-            Debug.Log($"explanationPanel アクティブ状態: {explanationPanel.activeInHierarchy}");
-        }
-        
-        if (explanationText != null)
-        {
-            Debug.Log($"explanationText 内容: '{explanationText.text}'");
-        }
-        
-        Debug.Log("=== UI要素状態確認完了 ===");
-    }
-
-    /// <summary>
-    /// デバッグ用：不足しているUI要素の自動検索
-    /// </summary>
-    [ContextMenu("Auto Find Missing UI Elements")]
-    public void AutoFindMissingUIElements()
-    {
-        if (!enableDebugFunctions) return;
-        
-        Debug.Log("=== UI要素自動検索開始 ===");
-        
-        // ExplanationPanel の自動検索
-        if (explanationPanel == null)
-        {
-            GameObject panel = GameObject.Find("ExplanationPanel");
-            if (panel != null)
+            RaycastHit hit;
+            Vector3 rayStart = new Vector3(resetPos.x, resetPos.y + 10, resetPos.z);
+            if (Physics.Raycast(rayStart, Vector3.down, out hit, resetSettings.groundDetectionDistance))
             {
-                explanationPanel = panel;
-                Debug.Log("✅ ExplanationPanel を自動検出しました");
+                resetPos.y = hit.point.y + resetSettings.heightOffset;
+                Debug.Log("地面検出成功: 高さ " + resetPos.y);
             }
             else
             {
-                // より詳細な検索
-                GameObject[] allObjects = FindObjectsOfType<GameObject>();
-                foreach (GameObject obj in allObjects)
+                Debug.LogWarning("地面検出失敗。設定位置をそのまま使用します");
+                if (resetSettings.forceHeightOffset)
                 {
-                    if (obj.name.Contains("Explanation") && obj.name.Contains("Panel"))
-                    {
-                        explanationPanel = obj;
-                        Debug.Log($"✅ ExplanationPanel を部分一致で検出: {obj.name}");
-                        break;
-                    }
-                }
-                
-                if (explanationPanel == null)
-                {
-                    Debug.LogWarning("❌ ExplanationPanel が見つかりません。動的作成を試行します。");
-                    StartCoroutine(CreateExplanationPanelDynamically("テスト解説"));
+                    resetPos.y += resetSettings.heightOffset;
                 }
             }
         }
-        
-        // ExplanationText の自動検索
-        if (explanationText == null)
+        else if (resetSettings.forceHeightOffset)
         {
-            // 名前での検索
-            Text[] allTexts = FindObjectsOfType<Text>();
-            foreach (Text text in allTexts)
-            {
-                if (text.name == "ExplanationText" || text.name.Contains("Explanation"))
-                {
-                    explanationText = text;
-                    Debug.Log($"✅ ExplanationText を自動検出しました: {text.name}");
-                    break;
-                }
-            }
-            
-            // ExplanationPanelの子要素から検索
-            if (explanationText == null && explanationPanel != null)
-            {
-                Text childText = explanationPanel.GetComponentInChildren<Text>();
-                if (childText != null)
-                {
-                    explanationText = childText;
-                    Debug.Log($"✅ ExplanationText を子要素から検出: {childText.name}");
-                }
-            }
-            
-            if (explanationText == null)
-            {
-                Debug.LogWarning("❌ ExplanationText が見つかりません。手動作成が必要です。");
-            }
+            resetPos.y += resetSettings.heightOffset;
         }
         
-        // CurrentScoreText の自動検索
-        if (currentScoreText == null)
+        // CharacterControllerの場合は一時的に無効化
+        CharacterController cc = player.GetComponent<CharacterController>();
+        bool ccWasEnabled = false;
+        if (cc != null)
         {
-            Text[] allTexts = FindObjectsOfType<Text>();
-            foreach (Text text in allTexts)
-            {
-                if (text.name == "CurrentScoreText" || text.name.Contains("Score"))
-                {
-                    currentScoreText = text;
-                    Debug.Log($"✅ CurrentScoreText を自動検出しました: {text.name}");
-                    break;
-                }
-            }
+            ccWasEnabled = cc.enabled;
+            cc.enabled = false;
         }
         
-        Debug.Log("=== UI要素自動検索完了 ===");
+        // 位置をリセット
+        player.position = resetPos;
         
-        // 検索後の状態確認
-        CheckUIElementsStatus();
-    }
-
-    /// <summary>
-    /// 解説パネル表示テスト（デバッグ用）
-    /// </summary>
-    [ContextMenu("Test Explanation Panel")]
-    public void TestExplanationPanel()
-    {
-        if (!enableDebugFunctions) return;
+        // 向きリセット
+        if (resetSettings.resetRotation)
+        {
+            player.rotation = Quaternion.Euler(resetSettings.resetRotationEuler);
+        }
         
-        Debug.Log("🧪 解説パネル表示テスト開始");
+        // CharacterControllerを再有効化
+        if (cc != null && ccWasEnabled)
+        {
+            cc.enabled = true;
+        }
         
-        string testExplanation = "これはテスト用の解説です。解説パネルが正常に表示されるかを確認します。";
-        
-        StartCoroutine(TestExplanationDisplay(testExplanation));
+        Debug.Log("プレイヤー位置リセット完了: " + resetPos);
     }
     
     /// <summary>
-    /// 解説表示テスト実行
+    /// プリセット位置の取得
     /// </summary>
-    private IEnumerator TestExplanationDisplay(string explanation)
+    private Vector3 GetPresetPosition(PresetPosition preset)
     {
-        Debug.Log($"🧪 解説テスト: {explanation}");
-        
-        // UI要素の自動検索
-        AutoFindMissingUIElements();
-        yield return new WaitForSeconds(0.1f);
-        
-        // 解説パネル表示処理をテスト
-        if (explanationPanel != null && explanationText != null)
+        switch (preset)
         {
-            explanationPanel.SetActive(true);
-            explanationText.text = explanation;
-            
-            Debug.Log("✅ 解説パネルテスト表示成功");
-            
-            yield return new WaitForSeconds(5f); // 5秒間表示
-            
-            explanationPanel.SetActive(false);
-            Debug.Log("✅ 解説パネルテスト終了");
+            case PresetPosition.Center: return new Vector3(0, 3, 5);
+            case PresetPosition.FarCenter: return new Vector3(0, 3, 10);
+            case PresetPosition.LeftSide: return new Vector3(-5, 3, 5);
+            case PresetPosition.RightSide: return new Vector3(5, 3, 5);
+            case PresetPosition.HighCenter: return new Vector3(0, 8, 5);
+            case PresetPosition.StartPosition: return new Vector3(0, 1, 0);
+            default: return new Vector3(0, 3, 5);
+        }
+    }
+    
+    /// <summary>
+    /// 次の問題開始の遅延
+    /// </summary>
+    private IEnumerator StartNextQuestionDelay()
+    {
+        yield return new WaitForSeconds(1.0f);
+        StartCurrentQuestion();
+    }
+
+    /// <summary>
+    /// 回答が選択された時の処理（CryptoAnswerCubeから呼ばれる）
+    /// </summary>
+    public void OnAnswerSelected(int selectedAnswerIndex)
+    {
+        if (!isGameActive)
+        {
+            Debug.LogWarning("ゲームが非アクティブ状態のため、回答選択を無視します");
+            return;
+        }
+        
+        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length)
+        {
+            Debug.LogError("OnAnswerSelected: 無効なゲーム状態です");
+            return;
+        }
+        
+        // 現在の問題情報を取得
+        CryptoType currentType = currentGameSet[currentQuestionIndex];
+        var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
+        
+        if (question == null)
+        {
+            Debug.LogError("OnAnswerSelected: 問題データの取得に失敗しました");
+            return;
+        }
+        
+        Debug.Log("[OnAnswerSelected] 選択された回答: インデックス " + selectedAnswerIndex);
+        Debug.Log("[OnAnswerSelected] 正解インデックス: " + question.correctAnswerIndex);
+        Debug.Log("[OnAnswerSelected] 現在の問題: " + currentType + ", ステップ: " + currentStepIndex);
+        
+        // 回答をチェックして処理
+        bool isCorrect = (selectedAnswerIndex == question.correctAnswerIndex);
+        
+        if (isCorrect)
+        {
+            Debug.Log("✅ 正解!");
+            OnCorrectAnswer(selectedAnswerIndex);
         }
         else
         {
-            Debug.LogError("❌ 解説パネルテスト失敗：UI要素が見つかりません");
-            
-            // 動的作成を試行
-            yield return StartCoroutine(CreateExplanationPanelDynamically(explanation));
-            
-            if (explanationPanel != null && explanationText != null)
-            {
-                explanationPanel.SetActive(true);
-                yield return new WaitForSeconds(5f);
-                explanationPanel.SetActive(false);
-                Debug.Log("✅ 動的作成パネルでテスト完了");
-            }
+            Debug.Log("❌ 不正解...");
+            OnIncorrectAnswerSelected(selectedAnswerIndex);
         }
     }
 
     /// <summary>
-    /// 強制的に解説パネルを表示する（デバッグ用）
+    /// 不正解後の遅延処理
     /// </summary>
-    [ContextMenu("Force Show Explanation Panel")]
-    public void ForceShowExplanationPanel()
+    private IEnumerator HandleIncorrectAnswerDelay()
     {
-        if (!enableDebugFunctions) return;
+        // 2秒間待機
+        yield return new WaitForSeconds(2.0f);
         
-        Debug.Log("🔧 解説パネル強制表示開始");
-        
-        string testExplanation = "これは強制表示テストです。解説パネルが正常に表示されるかを確認します。";
-        
-        StartCoroutine(ForceDisplayExplanation(testExplanation));
-    }
-    
-    /// <summary>
-    /// 強制的に解説を表示する実行部分
-    /// </summary>
-    private IEnumerator ForceDisplayExplanation(string explanation)
-    {
-        Debug.Log("🔧 強制解説表示実行中...");
-        
-        // 1. まずUI要素を再検索
-        AutoFindMissingUIElements();
-        yield return new WaitForSeconds(0.1f);
-        
-        // 2. UI要素の状態を詳細チェック
-        Debug.Log($"[強制表示] explanationPanel: {(explanationPanel != null ? $"存在({explanationPanel.name})" : "null")}");
-        Debug.Log($"[強制表示] explanationText: {(explanationText != null ? $"存在({explanationText.name})" : "null")}");
-        
-        // 3. パネルが存在しない場合は動的作成
-        if (explanationPanel == null)
-        {
-            Debug.Log("🔧 解説パネルが存在しないため動的作成を実行");
-            yield return StartCoroutine(CreateExplanationPanelDynamically(explanation));
-            yield return new WaitForSeconds(0.2f);
-        }
-        
-        // 4. 解説表示を実行
-        if (explanationPanel != null && explanationText != null)
-        {
-            Debug.Log("✅ UI要素確認完了、解説表示を開始");
-            
-            // パネルを前面に表示
-            explanationPanel.SetActive(true);
-            explanationText.text = explanation;
-            
-            // Canvas順序を最前面に
-            Canvas canvas = explanationPanel.GetComponentInParent<Canvas>();
-            if (canvas != null)
-            {
-                canvas.sortingOrder = 2000;
-            }
-            
-            Debug.Log($"✅ 強制解説表示成功: '{explanation}'");
-            
-            yield return new WaitForSeconds(5f);
-            
-            // 元に戻す
-            explanationPanel.SetActive(false);
-            if (canvas != null)
-            {
-                canvas.sortingOrder = 0;
-            }
-            
-            Debug.Log("✅ 強制解説表示終了");
-        }
-        else
-        {
-            Debug.LogError("❌ 強制解説表示失敗: UI要素が作成できませんでした");
-            
-            // 最終手段：console出力のみ
-            Debug.LogError($"[解説内容] {explanation}");
-        }
-    }
-
-    /// <summary>
-    /// ProgressTextの手動テスト用メソッド
-    /// </summary>
-    [ContextMenu("Test ProgressText Update")]
-    public void TestProgressTextUpdate()
-    {
-        Debug.Log("=== ProgressText テスト開始 ===");
-        Debug.Log($"progressText == null: {progressText == null}");
-        
-        if (progressText != null)
-        {
-            Debug.Log($"progressText.gameObject.name: {progressText.gameObject.name}");
-            Debug.Log($"progressText.gameObject.activeInHierarchy: {progressText.gameObject.activeInHierarchy}");
-            Debug.Log($"現在のprogressText.text: '{progressText.text}'");
-            
-            // 手動でテスト値を設定
-            progressText.text = "テスト: 2/5 共通鍵暗号";
-            Debug.Log($"テスト後のprogressText.text: '{progressText.text}'");
-            
-            // 実際のUpdateProgressTextメソッドをテスト
-            Debug.Log($"currentGameSet == null: {currentGameSet == null}");
-            Debug.Log($"currentQuestionIndex: {currentQuestionIndex}");
-            Debug.Log($"currentStepIndex: {currentStepIndex}");
-            
-            if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
-            {
-                string cryptoName = GetCryptoTypeName(currentGameSet[currentQuestionIndex]);
-                int totalSteps = CryptoQuestionDatabase.GetStepCount(currentGameSet[currentQuestionIndex]);
-                Debug.Log($"cryptoName: {cryptoName}, totalSteps: {totalSteps}");
-                Debug.Log($"生成される文字列: '問題 {currentStepIndex + 1}/{totalSteps} - {cryptoName}'");
-                
-                UpdateProgressText();
-            }
-        }
-        Debug.Log("=== ProgressText テスト終了 ===");
-    }
-    
-    /// <summary>
-    /// currentStepIndexを手動で進めるテスト用メソッド
-    /// </summary>
-    [ContextMenu("Test Step Progress")]
-    public void TestStepProgress()
-    {
-        Debug.Log("=== ステップ進行テスト ===");
-        currentStepIndex++;
-        Debug.Log($"currentStepIndex を {currentStepIndex} に増加");
-        UpdateProgressText();
-        Debug.Log("=== ステップ進行テスト終了 ===");
-    }
-
-    /// <summary>
-    /// キャンバス解説システムのクイックテスト（デバッグ用）
-    /// </summary>
-    [ContextMenu("Quick Test Canvas Explanation")]
-    public void QuickTestCanvasExplanation()
-    {
-        if (!enableDebugFunctions) return;
-        
-        string testExplanation = "🧪 【キャンバステスト解説】これはキャンバス上の専用パネルに表示される解説テストです。\n\n共通鍵暗号では送信者と受信者が同じ暗号鍵を使用してデータの暗号化と復号化を行います。この方式では鍵の安全な配布が重要な課題となります。\n\n公開鍵暗号と組み合わせることで、より安全な通信システムを構築できます。";
-        
-        Debug.Log("🧪 キャンバス解説システムテスト開始");
-        Debug.Log($"🧪 テスト用解説内容: '{testExplanation}'");
-        Debug.Log($"🧪 テスト用解説長: {testExplanation.Length}");
-        
-        StartCoroutine(ShowExplanationOnCanvas(testExplanation));
-    }
-
-    /// <summary>
-    /// 解説パネル表示の即座テスト（デバッグ用）
-    /// </summary>
-    [ContextMenu("Test Explanation Panel Immediate")]
-    public void TestExplanationPanelImmediate()
-    {
-        if (!enableDebugFunctions) return;
-        
-        Debug.Log("🧪 解説パネル即座テスト開始");
-        StartCoroutine(ImmediateExplanationTest());
-    }
-    
-    /// <summary>
-    /// 解説テキスト表示強制テスト（デバッグ用）
-    /// </summary>
-    [ContextMenu("Force Show Explanation Text")]
-    public void ForceShowExplanationText()
-    {
-        if (!enableDebugFunctions) return;
-        
-        Debug.Log("🔧 解説テキスト強制表示テスト");
-        StartCoroutine(ForceExplanationTextTest());
-    }
-    
-    /// <summary>
-    /// 解説テキストの強制表示テスト
-    /// </summary>
-    private IEnumerator ForceExplanationTextTest()
-    {
-        string testExplanation = "【強制テスト】これは解説テキストの強制表示テストです。このテキストが表示されていれば、解説システムは正常に動作しています。";
-        
-        Debug.Log("🔧 解説パネル存在確認開始");
-        yield return StartCoroutine(EnsureExplanationPanelExists());
-        
-        if (explanationPanel != null && explanationText != null)
-        {
-            Debug.Log("✅ 解説パネルとテキストが存在、強制表示開始");
-            
-            // テキストを強制設定
-            explanationText.text = testExplanation;
-            explanationText.color = Color.yellow; // 目立つ色に変更
-            explanationText.fontSize = 36;
-            explanationText.enabled = true;
-            
-            // パネルを強制表示
-            explanationPanel.SetActive(true);
-            
-            // Canvas順序を最前面に
-            Canvas canvas = explanationPanel.GetComponentInParent<Canvas>();
-            if (canvas != null)
-            {
-                canvas.sortingOrder = 2000;
-            }
-            
-            Debug.Log($"🔧 強制表示設定完了 - テキスト: '{explanationText.text}'");
-            
-            yield return new WaitForSeconds(3f);
-            
-            // 元に戻す
-            explanationPanel.SetActive(false);
-            if (canvas != null)
-            {
-                canvas.sortingOrder = 0;
-            }
-            
-            Debug.Log("✅ 強制表示テスト完了");
-        }
-        else
-        {
-            Debug.LogError("❌ 解説パネルまたはテキストが見つかりません");
-        }
-    }
-    
-    /// <summary>
-    /// 即座の解説表示テスト
-    /// </summary>
-    private IEnumerator ImmediateExplanationTest()
-    {
-        string testExplanation = "🧪 これは即座テスト用の解説です。パネルが正しく表示されるかを確認します。";
-        
-        Debug.Log("🔧 解説パネル存在確保開始");
-        yield return StartCoroutine(EnsureExplanationPanelExists());
-        
-        Debug.Log("📋 解説表示テスト実行");
-        CoroutineResult<bool> testResult = new CoroutineResult<bool>();
-        yield return StartCoroutine(DisplayExplanationPanel(testExplanation, testResult));
-        bool success = testResult.Result;
-        
-        if (!success)
-        {
-            Debug.Log("🔄 フォールバック表示テスト");
-            yield return StartCoroutine(ShowExplanationFallback(testExplanation));
-        }
-        
-        Debug.Log("✅ 即座テスト完了");
-    }
-    
-    /// <summary>
-    /// 解説パネル強制再作成（デバッグ用）
-    /// </summary>
-    [ContextMenu("Force Recreate Explanation Panel")]
-    public void ForceRecreateExplanationPanel()
-    {
-        if (!enableDebugFunctions) return;
-        
-        Debug.Log("🔧 解説パネル強制再作成開始");
-        
-        // 既存パネルを削除
-        if (explanationPanel != null)
-        {
-            Destroy(explanationPanel);
-            explanationPanel = null;
-            explanationText = null;
-            Debug.Log("🗑️ 既存パネル削除完了");
-        }
-        
-        // 強制再作成
-        StartCoroutine(CreateExplanationPanelDynamically("🔧 強制再作成テスト用の解説です。"));
-    }
-
-    /// <summary>
-    /// 解説パネル問題診断テスト（デバッグ用）
-    /// </summary>
-    [ContextMenu("Diagnose Explanation Panel")]
-    public void DiagnoseExplanationPanel()
-    {
-        if (!enableDebugFunctions) return;
-        
-        Debug.Log("🔍 解説パネル診断開始");
-        StartCoroutine(DiagnoseExplanationPanelCoroutine());
-    }
-    
-    /// <summary>
-    /// 解説パネル診断のコルーチン
-    /// </summary>
-    private IEnumerator DiagnoseExplanationPanelCoroutine()
-    {
-        Debug.Log("=== 解説パネル診断レポート ===");
-        
-        // 1. 基本変数チェック
-        Debug.Log($"1. 基本変数状態:");
-        Debug.Log($"   - explanationPanel: {(explanationPanel != null ? "存在" : "null")}");
-        Debug.Log($"   - explanationText: {(explanationText != null ? "存在" : "null")}");
-        
-        if (explanationPanel != null)
-        {
-            Debug.Log($"   - パネル名: {explanationPanel.name}");
-            Debug.Log($"   - パネルアクティブ: {explanationPanel.activeSelf}");
-            Debug.Log($"   - パネル階層アクティブ: {explanationPanel.activeInHierarchy}");
-        }
-        
-        if (explanationText != null)
-        {
-            Debug.Log($"   - テキスト名: {explanationText.name}");
-            Debug.Log($"   - テキスト内容: '{explanationText.text}'");
-            Debug.Log($"   - テキストアクティブ: {explanationText.gameObject.activeSelf}");
-        }
-        
-        // 2. パネル再作成テスト
-        Debug.Log($"2. パネル再作成テスト:");
-        yield return StartCoroutine(EnsureExplanationPanelExists());
-        
-        Debug.Log($"   - 再作成後 explanationPanel: {(explanationPanel != null ? "存在" : "null")}");
-        Debug.Log($"   - 再作成後 explanationText: {(explanationText != null ? "存在" : "null")}");
-        
-        // 3. 表示テスト
-        if (explanationPanel != null && explanationText != null)
-        {
-            Debug.Log($"3. 表示テスト実行:");
-            
-            string testText = "🧪 これは診断テストです。このテキストが表示されれば解説システムは動作しています。";
-            
-            CoroutineResult<bool> testResult = new CoroutineResult<bool>();
-            yield return StartCoroutine(DisplayExplanationPanel(testText, testResult));
-            
-            Debug.Log($"   - 表示テスト結果: {(testResult.Result ? "成功" : "失敗")}");
-        }
-        else
-        {
-            Debug.LogError("❌ パネルまたはテキストが作成されませんでした");
-        }
-        
-        // 4. Canvas確認
-        Debug.Log($"4. Canvas状態確認:");
-        Canvas[] allCanvases = FindObjectsOfType<Canvas>();
-        Debug.Log($"   - シーン内Canvas数: {allCanvases.Length}");
-        
-        for (int i = 0; i < allCanvases.Length; i++)
-        {
-            Canvas canvas = allCanvases[i];
-            Debug.Log($"   - Canvas{i+1}: {canvas.name} (sortingOrder: {canvas.sortingOrder}, アクティブ: {canvas.gameObject.activeSelf})");
-        }
-        
-        Debug.Log("=== 診断完了 ===");
-    }
-
-    /// <summary>
-    /// 不正解時の解説表示をシミュレート（デバッグ用）
-    /// </summary>
-    [ContextMenu("Simulate Wrong Answer")]
-    public void SimulateWrongAnswer()
-    {
-        if (!enableDebugFunctions) return;
-        
-        Debug.Log("🧪 不正解シミュレーション開始");
-        StartCoroutine(SimulateWrongAnswerCoroutine());
-    }
-    
-    /// <summary>
-    /// 不正解時の解説表示シミュレーション
-    /// </summary>
-    private IEnumerator SimulateWrongAnswerCoroutine()
-    {
-        // 現在の問題から解説を取得してテスト
+        // 同じ問題を再表示する場合
         if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
         {
-            CryptoType currentType = currentGameSet[currentQuestionIndex];
-            CryptoQuestion currentQuestion = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
-            
-            if (currentQuestion != null)
-            {
-                Debug.Log($"📝 現在の問題: {currentQuestion.questionText}");
-                Debug.Log($"📝 選択肢数: {currentQuestion.answers.Length}");
-                Debug.Log($"📝 解説配列: {(currentQuestion.explanations != null ? currentQuestion.explanations.Length : 0)}個");
-                
-                // 不正解選択肢（正解以外）をランダム選択
-                int wrongAnswerIndex = 0;
-                while (wrongAnswerIndex == currentQuestion.correctAnswerIndex)
-                {
-                    wrongAnswerIndex = UnityEngine.Random.Range(0, currentQuestion.answers.Length);
-                }
-                
-                string simulatedExplanation = "";
-                if (currentQuestion.explanations != null && wrongAnswerIndex < currentQuestion.explanations.Length)
-                {
-                    simulatedExplanation = currentQuestion.explanations[wrongAnswerIndex];
-                }
-                else
-                {
-                    simulatedExplanation = $"【シミュレーション】選択肢「{currentQuestion.answers[wrongAnswerIndex]}」は不正解です。正解は「{currentQuestion.answers[currentQuestion.correctAnswerIndex]}」です。";
-                }
-                
-                Debug.Log($"🎭 シミュレーション解説: '{simulatedExplanation}'");
-                
-                // RetryCurrentQuestionを直接呼び出し（ゲームがアクティブな場合のみ）
-                if (isGameActive)
-                {
-                    yield return StartCoroutine(RetryCurrentQuestion(simulatedExplanation));
-                }
-                else
-                {
-                    Debug.Log("ゲーム非アクティブのため、シミュレーション解説をスキップします");
-                }
-            }
-            else
-            {
-                Debug.LogError("❌ 現在の問題が見つかりません");
-            }
+            Debug.Log("[HandleIncorrectAnswerDelay] 同じ問題を再表示します");
+            StartCurrentQuestion(); // 同じ問題を再表示（答えは再ランダム化される）
         }
-        else
-        {
-            // デフォルト解説でテスト
-            string defaultExplanation = "【テスト解説】これは不正解時の解説表示テストです。実際の解説パネルが正しく動作するかを確認しています。";
-            Debug.Log($"🔧 デフォルト解説使用: '{defaultExplanation}'");
-            if (isGameActive)
-            {
-                yield return StartCoroutine(RetryCurrentQuestion(defaultExplanation));
-            }
-            else
-            {
-                Debug.Log("ゲーム非アクティブのため、デフォルト解説テストをスキップします");
-            }
-        }
-        
-        Debug.Log("✅ 不正解シミュレーション完了");
-    }
-
-    /// <summary>
-    /// Enterキー入力待機とゲーム再開処理
-    /// </summary>
-    private IEnumerator WaitForRestartInput()
-    {
-        Debug.Log("🎮 Enterキー入力待機開始（プレイヤー移動は無効）");
-        
-        // プレイヤー入力が無効化されていることを確認
-        if (playerInput != null && playerInput.IsInputEnabled())
-        {
-            Debug.Log("[WaitForRestartInput] プレイヤー入力が有効になっていたため、無効化します");
-            DisablePlayerInput();
-        }
-        
-        // Enterキーが押されるまで待機
-        while (true)
-        {
-            if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter))
-            {
-                Debug.Log("✅ Enterキーが押されました。ゲームを再開始します。");
-                break;
-            }
-            yield return null;
-        }
-        
-        // ゲーム再開処理
-        yield return StartCoroutine(RestartGameCoroutine());
-    }
-    
-    /// <summary>
-    /// ゲーム再開処理（コルーチン版）
-    /// </summary>
-    private IEnumerator RestartGameCoroutine()
-    {
-        Debug.Log("🔄 ゲーム再開処理開始");
-        
-        // UIパネルを非表示
-        if (resultPanel != null) resultPanel.SetActive(false);
-        if (finalResultPanel != null) finalResultPanel.SetActive(false);
-        if (explanationPanel != null) explanationPanel.SetActive(false);
-        
-        // Canvas順序をリセット
-        Canvas[] allCanvases = FindObjectsOfType<Canvas>();
-        foreach (Canvas canvas in allCanvases)
-        {
-            canvas.sortingOrder = 0;
-        }
-        
-        // スコアとプログレスをリセット
-        currentScore = 0;
-        correctAnswers = 0;
-        totalQuestions = 0;
-        currentQuestionIndex = 0;
-        currentStepIndex = 0;
-        
-        // プログレス表示をリセット
-        if (progressTracker != null)
-        {
-            progressTracker.ResetProgressForNewGame();
-        }
-        
-        // スコア表示をリセット
-        UpdateScoreDisplay();
-        
-        // 新しいゲームを開始
-        yield return new WaitForSeconds(0.5f); // 少し待機してからスタート
-        
-        Debug.Log("🎯 新しいゲーム開始");
-        Start();
-    }
-
-    /// <summary>
-    /// ゲーム終了処理（コルーチン版）
-    /// </summary>
-    private IEnumerator EndGame()
-    {
-        Debug.Log("🏁 ゲーム終了処理開始");
-        
-        isGameActive = false;
-        
-        // 少し待機してから結果表示
-        yield return new WaitForSeconds(1f);
-        
-        ShowResults();
-    }
-
-    /// <summary>
-    /// シンプルで確実な解説表示（テキスト表示問題修正版）
-    /// </summary>
-    private IEnumerator ShowExplanationSimple(string explanation)
-    {
-        Debug.Log($"🎯 シンプル解説表示開始: '{explanation}'");
-        Debug.Log($"🔍 explanation変数の詳細確認:");
-        Debug.Log($"   - 長さ: {(explanation?.Length ?? 0)}");
-        Debug.Log($"   - null確認: {(explanation == null ? "null" : "not null")}");
-        Debug.Log($"   - 空確認: {(string.IsNullOrEmpty(explanation) ? "empty" : "not empty")}");
-        Debug.Log($"   - 内容: '{explanation}'");
-        
-        // 既存の questionText を使用した確実な表示
-        if (questionText != null)
-        {
-            Debug.Log($"🔍 questionText詳細確認:");
-            Debug.Log($"   - 名前: {questionText.name}");
-            Debug.Log($"   - 現在のテキスト: '{questionText.text}'");
-            Debug.Log($"   - アクティブ: {questionText.gameObject.activeSelf}");
-            Debug.Log($"   - 階層内アクティブ: {questionText.gameObject.activeInHierarchy}");
-            
-            // 元のテキストと色を保存
-            string originalText = questionText.text;
-            Color originalColor = questionText.color;
-            
-            // 解説内容の最終確認と安全性チェック
-            string safeExplanation = string.IsNullOrEmpty(explanation) ? "解説内容が取得できませんでした" : explanation;
-            string displayText = $"💡 解説\n\n{safeExplanation}\n\n⏳ 3秒後に問題を再表示します...";
-            
-            Debug.Log($"🔧 表示テキスト設定:");
-            Debug.Log($"   - safeExplanation: '{safeExplanation}'");
-            Debug.Log($"   - displayText: '{displayText}'");
-            
-            // 解説表示用の設定
-            questionText.text = displayText;
-            questionText.color = new Color(1f, 0.9f, 0.3f, 1f); // 明るい黄色
-            questionText.fontSize = Math.Max(questionText.fontSize, 24); // 最低24ポイント
-            
-            Debug.Log($"✅ questionTextで解説表示中 - 設定後のテキスト: '{questionText.text}'");
-            Debug.Log($"   - フォントサイズ: {questionText.fontSize}");
-            Debug.Log($"   - 色: {questionText.color}");
-            
-            // 3秒間表示
-            yield return new WaitForSeconds(3f);
-            
-            // 元に戻す
-            questionText.text = originalText;
-            questionText.color = originalColor;
-            
-            Debug.Log("✅ シンプル解説表示完了");
-        }
-        else
-        {
-            // questionText が無い場合はログのみ
-            Debug.LogError($"❌ 表示手段なし - 解説内容: {explanation}");
-            yield return new WaitForSeconds(2f);
-        }
-    }
-
-    /// <summary>
-    /// キャンバス上に専用解説パネルを表示（確実表示版）
-    /// </summary>
-    private IEnumerator ShowExplanationOnCanvas(string explanation)
-    {
-        Debug.Log($"🎯 キャンバス解説表示開始: '{explanation}'");
-        
-        // 安全性チェック
-        string safeExplanation = string.IsNullOrEmpty(explanation) ? "解説内容が取得できませんでした" : explanation;
-        
-        // 既存の解説パネルを削除
-        GameObject existingPanel = GameObject.Find("DynamicExplanationPanel");
-        if (existingPanel != null)
-        {
-            Destroy(existingPanel);
-            yield return new WaitForEndOfFrame();
-        }
-        
-        // 最適なCanvasを取得
-        Canvas targetCanvas = FindBestCanvas();
-        if (targetCanvas == null)
-        {
-            Debug.LogError("❌ Canvasが見つかりません！");
-            yield break;
-        }
-        
-        Debug.Log($"✅ Canvas発見: {targetCanvas.name}");
-        
-        GameObject explanationPanel = null;
-        bool creationSuccess = false;
-        
-        try
-        {
-            // 1. 解説パネル作成
-            explanationPanel = new GameObject("DynamicExplanationPanel");
-            explanationPanel.transform.SetParent(targetCanvas.transform, false);
-            
-            // 2. RectTransform設定（画面中央、大きめサイズ）
-            RectTransform panelRect = explanationPanel.AddComponent<RectTransform>();
-            panelRect.anchorMin = new Vector2(0.1f, 0.2f);
-            panelRect.anchorMax = new Vector2(0.9f, 0.8f);
-            panelRect.offsetMin = Vector2.zero;
-            panelRect.offsetMax = Vector2.zero;
-            
-            // 3. 背景画像設定
-            UnityEngine.UI.Image panelImage = explanationPanel.AddComponent<UnityEngine.UI.Image>();
-            panelImage.color = new Color(0.05f, 0.05f, 0.15f, 0.95f); // 濃い青
-            
-            // 4. 外枠設定
-            UnityEngine.UI.Outline panelOutline = explanationPanel.AddComponent<UnityEngine.UI.Outline>();
-            panelOutline.effectColor = Color.yellow;
-            panelOutline.effectDistance = new Vector2(4, 4);
-            
-            // 5. 影効果
-            UnityEngine.UI.Shadow panelShadow = explanationPanel.AddComponent<UnityEngine.UI.Shadow>();
-            panelShadow.effectColor = new Color(0, 0, 0, 0.7f);
-            panelShadow.effectDistance = new Vector2(6, -6);
-            
-            // 6. テキスト部分作成
-            GameObject textObject = new GameObject("ExplanationText");
-            textObject.transform.SetParent(explanationPanel.transform, false);
-            
-            // 7. テキスト用RectTransform設定
-            RectTransform textRect = textObject.AddComponent<RectTransform>();
-            textRect.anchorMin = Vector2.zero;
-            textRect.anchorMax = Vector2.one;
-            textRect.offsetMin = new Vector2(30f, 30f);  // 余白
-            textRect.offsetMax = new Vector2(-30f, -30f);
-            
-            // 8. Textコンポーネント設定
-            Text textComponent = textObject.AddComponent<Text>();
-            textComponent.text = $"💡 解説\n\n{safeExplanation}\n\n✨ 5秒後に問題を再表示します ✨";
-            textComponent.fontSize = 32;
-            textComponent.color = Color.white;
-            textComponent.alignment = TextAnchor.MiddleCenter;
-            textComponent.lineSpacing = 1.4f;
-            textComponent.horizontalOverflow = HorizontalWrapMode.Wrap;
-            textComponent.verticalOverflow = VerticalWrapMode.Truncate;
-            
-            // 9. フォント設定
-            Font defaultFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            if (defaultFont != null)
-            {
-                textComponent.font = defaultFont;
-                Debug.Log("✅ デフォルトフォント設定成功");
-            }
-            
-            // 10. テキスト装飾
-            UnityEngine.UI.Outline textOutline = textObject.AddComponent<UnityEngine.UI.Outline>();
-            textOutline.effectColor = Color.black;
-            textOutline.effectDistance = new Vector2(3, 3);
-            
-            // 11. Canvas順序を最前面に設定
-            targetCanvas.sortingOrder = 1000;
-            
-            Debug.Log($"✅ 解説パネル作成完了: '{textComponent.text}'");
-            Debug.Log($"   - パネルサイズ: {panelRect.sizeDelta}");
-            Debug.Log($"   - テキストサイズ: {textRect.sizeDelta}");
-            Debug.Log($"   - フォント: {(textComponent.font != null ? textComponent.font.name : "null")}");
-            
-            creationSuccess = true;
-        }
-        catch (System.Exception e)
-        {
-            Debug.LogError($"❌ 解説パネル作成エラー: {e.Message}");
-            Debug.LogError($"❌ スタックトレース: {e.StackTrace}");
-            creationSuccess = false;
-        }
-        
-        // パネル作成が成功した場合のみ表示処理を実行
-        if (creationSuccess && explanationPanel != null)
-        {
-            // 12. パネル表示
-            explanationPanel.SetActive(true);
-            
-            // 13. 表示時間待機（try-catchの外でyield return使用）
-            yield return new WaitForSeconds(5f);
-            
-            // 14. パネル削除
-            if (explanationPanel != null)
-            {
-                Destroy(explanationPanel);
-                Debug.Log("✅ 解説パネル削除完了");
-            }
-            
-            // 15. Canvas順序をリセット
-            targetCanvas.sortingOrder = 0;
-        }
-        
-        Debug.Log("✅ キャンバス解説表示完了");
     }
 
     /// <summary>
@@ -3482,11 +1663,11 @@ public class CryptoGameManager : MonoBehaviour
         if (playerInput != null)
         {
             playerInput.SetInputEnabled(false);
-            Debug.Log("[CryptoGameManager] プレイヤー入力を無効化しました");
+            Debug.Log("プレイヤー入力を無効化しました");
         }
         else
         {
-            Debug.LogWarning("[CryptoGameManager] プレイヤー入力コンポーネントが見つかりません。入力無効化をスキップします。");
+            Debug.LogWarning("PlayerInputコンポーネントが見つかりません - 入力制御をスキップ");
         }
     }
     
@@ -3498,12 +1679,14 @@ public class CryptoGameManager : MonoBehaviour
         if (playerInput != null)
         {
             playerInput.SetInputEnabled(true);
-            Debug.Log("[CryptoGameManager] プレイヤー入力を有効化しました");
+            Debug.Log("プレイヤー入力を有効化しました");
         }
         else
         {
-            Debug.LogWarning("[CryptoGameManager] プレイヤー入力コンポーネントが見つかりません。入力有効化をスキップします。");
+            Debug.LogWarning("PlayerInputコンポーネントが見つかりません - 入力制御をスキップ");
         }
     }
 
+    // 注意: ここに残っていた不完全な #if UNITY_EDITOR ブロック（MenuItem 定義）を削除しました。
+    //       エディタ専用のメニュー追加が必要な場合は、Assets/.../Editor フォルダに別ファイルを作成してください。
 }

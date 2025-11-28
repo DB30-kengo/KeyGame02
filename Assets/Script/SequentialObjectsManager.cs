@@ -563,7 +563,7 @@ public class SequentialObjectsManager : MonoBehaviour
                 else
                 {
                     // シーン内のすべてのTextを検索
-                    Text[] allTexts = FindObjectsOfType<Text>();
+                    Text[] allTexts = FindObjectsByType<Text>(FindObjectsSortMode.None);
                     if (allTexts.Length > 0)
                     {
                         messageText = allTexts[0]; // 最初に見つかったTextを使用
@@ -608,7 +608,7 @@ public class SequentialObjectsManager : MonoBehaviour
                 else
                 {
                     // すべてのキャンバスを検索して名前に「over」を含むものを探す
-                    Canvas[] allCanvases = FindObjectsOfType<Canvas>();
+                    Canvas[] allCanvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
                     foreach (Canvas canvas in allCanvases)
                     {
                         if (canvas.name.ToLower().Contains("over") || 
@@ -659,7 +659,7 @@ public class SequentialObjectsManager : MonoBehaviour
                 else
                 {
                     // すべてのキャンバスを検索して名前に「clear」を含むものを探す
-                    Canvas[] allCanvases = FindObjectsOfType<Canvas>();
+                    Canvas[] allCanvases = FindObjectsByType<Canvas>(FindObjectsSortMode.None);
                     foreach (Canvas canvas in allCanvases)
                     {
                         if (canvas.name.ToLower().Contains("clear") || 

@@ -65,12 +65,12 @@ public class UniversalAspectRatioController : MonoBehaviour
         // Canvasの取得と設定
         if (targetCanvas == null)
         {
-            targetCanvas = FindObjectOfType<Canvas>();
+            targetCanvas = Object.FindFirstObjectByType<Canvas>();
         }
         
         if (targetCanvas != null)
         {
-            canvasScaler = targetCanvas.GetComponent<CanvasScaler>();
+            canvasScaler = Object.FindFirstObjectByType<CanvasScaler>();
             canvasRectTransform = targetCanvas.GetComponent<RectTransform>();
             
             // CanvasScalerの設定を最適化

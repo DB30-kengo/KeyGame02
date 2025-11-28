@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class AspectRatioController : MonoBehaviour
 {
@@ -124,4 +125,14 @@ public class AspectRatioController : MonoBehaviour
     public void SetAspectRatio4_3() { SetTargetAspectRatio(4f / 3f); }
     public void SetAspectRatio1_1() { SetTargetAspectRatio(1f / 1f); }
     public void SetAspectRatio21_9() { SetTargetAspectRatio(21f / 9f); }
+
+    private void OnPreRender()
+    {
+        // ここに処理を追加すると、カメラの描画前に実行されます
+    }
+
+    private void OnPostRender()
+    {
+        // ここに処理を追加すると、カメラの描画後に実行されます
+    }
 }

@@ -25,7 +25,9 @@ public class CryptoUILayout : MonoBehaviour
     [Header("UI Elements")]
     public Canvas mainCanvas;
     public Text timerText;
-    public Text progressText;
+    // progressText は CryptoUIManager 側で実際にテキストを管理します。
+    // レイアウト側は参照を保持してレイアウト設定のみ行います。
+    private Text progressTextRef;
     public Text questionText;
     public Button[] answerButtons;
     public GameObject progressPanel;
@@ -34,6 +36,17 @@ public class CryptoUILayout : MonoBehaviour
     
     private void Start()
     {
+        // 優先 : Inspector から直接割り当てられていればそれを使う（旧来の Inspector 互換性）
+        // それ以外は CryptoUIManager に定義された progressText を参照する
+        if (progressTextRef == null)
+        {
+            var uiManager = FindObjectOfType<CryptoUIManager>();
+            if (uiManager != null && uiManager.progressText != null)
+            {
+                progressTextRef = uiManager.progressText;
+            }
+        }
+        
         if (autoSetupLayout)
         {
             SetupUILayout();
@@ -89,9 +102,9 @@ public class CryptoUILayout : MonoBehaviour
         }
         
         // 進捗テキスト配置
-        if (progressText != null)
+        if (progressTextRef != null)
         {
-            RectTransform progressRect = progressText.GetComponent<RectTransform>();
+            RectTransform progressRect = progressTextRef.GetComponent<RectTransform>();
             
             // カスタム設定を優先しない場合のみ位置を変更
             if (!preserveCustomSettings)
@@ -101,12 +114,12 @@ public class CryptoUILayout : MonoBehaviour
                 progressRect.pivot = new Vector2(0.5f, 1);
                 progressRect.anchoredPosition = new Vector2(0, -80);
                 progressRect.sizeDelta = new Vector2(400, 30);
-                progressText.alignment = TextAnchor.MiddleCenter;
+                progressTextRef.alignment = TextAnchor.MiddleCenter;
             }
             
             // フォントサイズと色は設定に応じて適用
-            progressText.fontSize = preserveCustomSettings ? customProgressFontSize : 20;
-            progressText.color = Color.yellow;
+            progressTextRef.fontSize = preserveCustomSettings ? customProgressFontSize : 20;
+            progressTextRef.color = Color.yellow;
         }
     }
     
@@ -254,9 +267,9 @@ public class CryptoUILayout : MonoBehaviour
             Debug.Log($"QuestionText FontSize captured: {customQuestionFontSize}");
         }
         
-        if (progressText != null)
+        if (progressTextRef != null)
         {
-            customProgressFontSize = progressText.fontSize;
+            customProgressFontSize = progressTextRef.fontSize;
             Debug.Log($"ProgressText FontSize captured: {customProgressFontSize}");
         }
         
@@ -278,7 +291,7 @@ public class CryptoUILayout : MonoBehaviour
         if (preserveCustomSettings)
         {
             if (questionText != null) questionText.fontSize = customQuestionFontSize;
-            if (progressText != null) progressText.fontSize = customProgressFontSize;
+            if (progressTextRef != null) progressTextRef.fontSize = customProgressFontSize;
             if (timerText != null) timerText.fontSize = customTimerFontSize;
             
             Debug.Log("カスタム設定を適用しました。");

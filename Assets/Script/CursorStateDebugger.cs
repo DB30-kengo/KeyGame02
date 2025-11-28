@@ -126,6 +126,15 @@ public class CursorStateDebugger : MonoBehaviour
             info += $"Return Scene: {PlayerPrefs.GetString("ReturnScene")}\n";
         }
         
+        var manager = Object.FindFirstObjectByType<CryptoGameManager>();
+        if (manager != null)
+        {
+            info += $"\n=== CRYPTO GAME MANAGER INFO ===\n";
+            // info += $"State: {manager.gameState}\n";
+            // info += $"Level: {manager.currentLevel}\n";
+            // info += $"Score: {manager.playerScore}\n";
+        }
+        
         debugText.text = info;
     }
     

@@ -69,7 +69,8 @@ public class CryptoAnswerCubeImproved : MonoBehaviour
             audioSource.playOnAwake = false;
         }
         
-        gameManager = FindObjectOfType<CryptoGameManager>();
+        var manager = Object.FindFirstObjectByType<CryptoGameManager>();
+        gameManager = manager;
         uiManager = FindObjectOfType<CryptoUIManager>();
     }
     

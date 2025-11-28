@@ -60,7 +60,6 @@ public class CryptoAnswerCube : MonoBehaviour
     private CryptoUIManager uiManager;
     
     // 状態管理
-    private bool isHovered = false;
     private bool isSelected = false;
     private bool isActive = true;
     
@@ -83,8 +82,13 @@ public class CryptoAnswerCube : MonoBehaviour
         }
         
         // ゲームマネージャーを検索
-        gameManager = FindObjectOfType<CryptoGameManager>();
-        uiManager = FindObjectOfType<CryptoUIManager>();
+        var manager = Object.FindFirstObjectByType<CryptoGameManager>();
+        gameManager = manager != null ? manager.GetComponent<CryptoGameManager>() : null;
+        
+        var uiManager = Object.FindFirstObjectByType<CryptoUIManager>();
+        this.uiManager = uiManager != null ? uiManager.GetComponent<CryptoUIManager>() : null;
+
+        var cubeButton = Object.FindFirstObjectByType<CubeButton>();
     }
     
     private void SetupTextDisplay()
@@ -219,7 +223,6 @@ public class CryptoAnswerCube : MonoBehaviour
     {
         if (isSelected) return;
         
-        isHovered = true;
         SetMaterial(hoverMaterial);
         PlaySound(hoverSound);
         
@@ -236,7 +239,6 @@ public class CryptoAnswerCube : MonoBehaviour
     {
         if (isSelected) return;
         
-        isHovered = false;
         SetMaterial(normalMaterial);
     }
     
@@ -266,8 +268,13 @@ public class CryptoAnswerCube : MonoBehaviour
         // 選択エフェクト
         if (uiManager != null)
         {
-            uiManager.PlayCorrectAnswerEffects();
-            uiManager.AnimateButtonPress(null); // 3D用のアニメーション
+            // 強化された回答選択フィードバック
+            uiManager.PlayAnswerSelectionFeedback(transform, true);
+            Debug.Log($"[CryptoAnswerCube] アニメーション実行: {answerText}");
+        }
+        else
+        {
+            Debug.LogWarning("[CryptoAnswerCube] UIManagerが見つかりません。アニメーションをスキップします。");
         }
         
         Debug.Log($"回答選択準備完了: {answerIndex} - {answerText}");
@@ -360,7 +367,6 @@ public class CryptoAnswerCube : MonoBehaviour
     
     public void ResetCube()
     {
-        isHovered = false;
         isSelected = false;
         isActive = true;
         
@@ -393,6 +399,8 @@ public class CryptoAnswerCube : MonoBehaviour
             ResetCube();
         }
     }
+    
+
     
     // ギズモ表示
     private void OnDrawGizmosSelected()

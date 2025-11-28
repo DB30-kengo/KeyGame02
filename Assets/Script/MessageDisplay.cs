@@ -137,7 +137,7 @@ public class MessageDisplay : MonoBehaviour
         if (enableProgressDecrease && gameManager != null)
         {
             // 不正解処理を実行してゲージを減少させる
-            gameManager.AddIncorrectAnswerScore();
+            gameManager.OnIncorrectAnswerSelected();
             Debug.Log("[MessageDisplay] ゲージ減少処理を実行しました");
         }
         else if (enableProgressDecrease)
