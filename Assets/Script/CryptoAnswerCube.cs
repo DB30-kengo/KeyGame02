@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.UI; // Shadow クラス用に追加
+// using UnityEngine.UI; // 削除：このスクリプトでは TextMesh を使っているため UI 名前空間は不要
 using System.Collections;
 
 /// <summary>
@@ -280,7 +280,8 @@ public class CryptoAnswerCube : MonoBehaviour
         if (gameManager == null)
         {
             Debug.LogWarning("GameManagerが見つかりません。再検索を実行します。");
-            gameManager = FindObjectOfType<CryptoGameManager>();
+            // 変更：旧APIから新APIへ
+            gameManager = Object.FindFirstObjectByType<CryptoGameManager>();
             
             if (gameManager == null)
             {
