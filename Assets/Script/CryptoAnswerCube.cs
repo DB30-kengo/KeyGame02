@@ -93,6 +93,18 @@ public class CryptoAnswerCube : MonoBehaviour
     
     private void SetupTextDisplay()
     {
+        // 既に子に AnswerText があれば再作成しない（再表示時の重複防止）
+        Transform existing = transform.Find("AnswerText");
+        if (existing != null)
+        {
+            textMesh = existing.GetComponent<TextMesh>();
+            if (textMesh != null)
+            {
+                textMesh.text = answerText;
+                return; // 既存テキストを更新して終了
+            }
+        }
+
         // テキスト表示用の子オブジェクト作成
         GameObject textObject = new GameObject("AnswerText");
         textObject.transform.SetParent(transform);
@@ -180,6 +192,12 @@ public class CryptoAnswerCube : MonoBehaviour
                 textMesh.transform.LookAt(mainCamera.transform);
                 textMesh.transform.Rotate(0, 180, 0);
             }
+        }
+        else
+        {
+            // 再有効化時に TextMesh が null なら初期化を試みる
+            if (cubeRenderer == null) InitializeComponents();
+            if (textMesh == null) SetupTextDisplay();
         }
     }
     
@@ -305,7 +323,7 @@ public class CryptoAnswerCube : MonoBehaviour
         // フェードアウト効果
         yield return StartCoroutine(FadeOut());
         
-        // オブジェクトを無効化
+        // オブジェクトを完全に破棄せず無効化（既存処理を維持）
         gameObject.SetActive(false);
     }
     
@@ -370,31 +388,81 @@ public class CryptoAnswerCube : MonoBehaviour
         isSelected = false;
         isActive = true;
         
-        SetMaterial(normalMaterial);
-        gameObject.SetActive(true);
-        
-        // アルファ値をリセット
-        if (cubeRenderer != null)
+        // マテリアルを元に戻す（インスタンス化された material を使う）
+        if (cubeRenderer != null && normalMaterial != null)
         {
+            cubeRenderer.material = normalMaterial;
+            // alpha を確実に戻す
             Color color = cubeRenderer.material.color;
             color.a = 1f;
             cubeRenderer.material.color = color;
         }
         
+        gameObject.SetActive(true);
+        
+        // テキストアルファの復帰
         if (textMesh != null)
         {
             Color textColor = textMesh.color;
             textColor.a = 1f;
             textMesh.color = textColor;
         }
+        
+        // Collider と Renderer を再有効化（保険）
+        foreach (var col in GetComponentsInChildren<Collider>(true))
+        {
+            try { col.enabled = true; } catch { }
+        }
+        if (cubeRenderer != null) cubeRenderer.enabled = true;
     }
     
-    public void SetActive(bool active)
+    // 新規：外部（Manager の反射名）から呼ばれる公開リセット
+    public void ResetState()
     {
-        isActive = active;
-        gameObject.SetActive(active);
-        
-        if (active)
+        // Manager が呼べる名前に合わせた公開 API
+        ResetCube();
+        // 追加の保険処理
+        ResetVisualsAndComponents();
+    }
+    
+    // 追加ヘルパー：表示系コンポーネントを明示的に復帰
+    private void ResetVisualsAndComponents()
+    {
+        // Renderer / TextMesh / AudioSource / Collider を確実に復帰
+        if (cubeRenderer == null) cubeRenderer = GetComponent<Renderer>();
+        if (cubeRenderer != null) cubeRenderer.enabled = true;
+        if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        foreach (var col in GetComponentsInChildren<Collider>(true))
+        {
+            try { col.enabled = true; } catch { }
+        }
+        if (textMesh == null)
+        {
+            Transform t = transform.Find("AnswerText");
+            if (t != null) textMesh = t.GetComponent<TextMesh>();
+            if (textMesh == null) SetupTextDisplay();
+        }
+        if (textMesh != null)
+        {
+            Color tc = textMesh.color;
+            tc.a = 1f;
+            textMesh.color = tc;
+        }
+    }
+    
+    // 新規：再アクティブ時の初期化保障
+    private void OnEnable()
+    {
+        // オブジェクトが再び有効になった時に必要な参照を整える
+        if (cubeRenderer == null) cubeRenderer = GetComponent<Renderer>();
+        if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        if (textMesh == null)
+        {
+            Transform t = transform.Find("AnswerText");
+            if (t != null) textMesh = t.GetComponent<TextMesh>();
+        }
+        // 状態が不整合ならリセット
+        if (!isActive || isSelected)
         {
             ResetCube();
         }

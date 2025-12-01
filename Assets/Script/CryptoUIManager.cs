@@ -31,7 +31,7 @@ public class CryptoUIManager : MonoBehaviour
     public Color incorrectTextColor = Color.red;
     [Tooltip("結果表示の継続時間")]
     public float resultDisplayDuration = 2f;
-    
+
     [Header("Button Effects")]
     public float buttonScaleEffect = 1.2f;
     public float buttonEffectDuration = 0.2f;
@@ -213,31 +213,6 @@ public class CryptoUIManager : MonoBehaviour
         slider.value = targetValue;
     }
     
-    // 色変化アニメーション
-    public void AnimateColorChange(Graphic graphic, Color targetColor, float duration = 1f)
-    {
-        if (graphic != null)
-        {
-            StartCoroutine(ColorChangeAnimation(graphic, targetColor, duration));
-        }
-    }
-    
-    private IEnumerator ColorChangeAnimation(Graphic graphic, Color targetColor, float duration)
-    {
-        Color startColor = graphic.color;
-        float elapsedTime = 0f;
-        
-        while (elapsedTime < duration)
-        {
-            elapsedTime += Time.deltaTime;
-            float t = elapsedTime / duration;
-            graphic.color = Color.Lerp(startColor, targetColor, t);
-            yield return null;
-        }
-        
-        graphic.color = targetColor;
-    }
-    
     // テキストタイプライター効果
     public void TypewriterText(Text textComponent, string fullText, float typeSpeed = 0.05f)
     {
@@ -250,7 +225,7 @@ public class CryptoUIManager : MonoBehaviour
     private IEnumerator TypewriterEffect(Text textComponent, string fullText, float typeSpeed)
     {
         textComponent.text = "";
-        
+
         for (int i = 0; i <= fullText.Length; i++)
         {
             textComponent.text = fullText.Substring(0, i);
@@ -414,26 +389,16 @@ public class CryptoUIManager : MonoBehaviour
     }
     
     /// <summary>
-    /// 暗号方式の色でパルス効果
+    /// 暗号方式の色でパルス効果（色アニメーションを削除したため、実際には色変更を行わず待機のみ）
     /// </summary>
     private IEnumerator CryptoTypeColorPulse(Transform target, Color cryptoColor)
     {
-        Graphic graphic = target.GetComponent<Graphic>();
-        if (graphic == null) yield break;
-        
-        Color originalColor = graphic.color;
-        float elapsed = 0f;
-        
-        while (elapsed < cryptoTypeAnimationDuration)
-        {
-            float intensity = Mathf.Sin(elapsed * keyAnimationSpeed) * 0.5f + 0.5f;
-            graphic.color = Color.Lerp(originalColor, cryptoColor, intensity * 0.7f);
-            
-            elapsed += Time.deltaTime;
-            yield return null;
-        }
-        
-        graphic.color = originalColor;
+        // 元実装は Graphic.color をアニメーションしていましたが、色変更を取り除くため
+        // ここでは色を変更せず、他の処理とタイミングを合わせるために短時間待機します。
+        if (target == null) yield break;
+
+        // 必要に応じて待機時間を残す（元の演出時間を保持）
+        yield return new WaitForSeconds(cryptoTypeAnimationDuration);
     }
     
     /// <summary>
@@ -524,8 +489,8 @@ public class CryptoUIManager : MonoBehaviour
     /// </summary>
     private IEnumerator CorrectAnswerSequence(Transform target)
     {
-        // 1. スケールアップエフェクト
-        StartCoroutine(ButtonPressAnimation(target));
+        // 1. スケールアップエフェクト（回答キューブの一瞬拡大演出を無効化するため削除）
+        // StartCoroutine(ButtonPressAnimation(target)); // 削除しました
         
         // 2. 正解エフェクト再生（テキスト表示含む）
         PlayCorrectAnswerEffects();

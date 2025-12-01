@@ -4,6 +4,8 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.UI;
 using System;
+using System.Reflection; // 追加：リフレクション呼び出し用
+
 
 /// <summary>
 /// 暗号学習ゲームの中核管理システム（ヒント機能なし・純粋ゲーム版）
@@ -135,7 +137,7 @@ public class CryptoGameManager : MonoBehaviour
     private int totalQuestions = 0;
     private int currentScore = 0;
     private int pointsPerCorrect = 10;      // 正解時の獲得ポイント
-    private int pointsPerIncorrect = -2;    // 不正解時の減点
+    private int pointsPerIncorrect = -5;    // 不正解時の減点
     
     // 進捗管理
     private ProgressTracker progressTracker;
@@ -195,7 +197,7 @@ public class CryptoGameManager : MonoBehaviour
         // テスト用データ設定
         totalQuestions = 10;
         correctAnswers = 7;
-        currentScore = 68; // 7*10 - 3*2 = 68点の例
+        currentScore = 65; // 7*10 - 3*5 = 65点の例
         
         ShowFinalScore();
         Debug.Log("デバッグ: 最終スコア表示テスト実行 - Enterキー対応版");
@@ -449,6 +451,14 @@ public class CryptoGameManager : MonoBehaviour
     [Tooltip("固定ランダムシード値（テスト用）")]
     public int fixedRandomSeed = 12345;
 
+    // 追加: プレイヤーリスポーン→シャッフルのタイミング調整用パラメータ
+    [Header("Timing Settings - タイミング設定")]
+    [Tooltip("プレイヤーをリスポーン（ResetPlayerPosition 呼び出し）した後、回答キューブをシャッフルするまで待つ時間（秒）")]
+    public float playerRespawnToShuffleDelay = 0.5f;
+
+    [Tooltip("回答キューブをシャッフルした後、物理/描画の安定を待つ追加の時間（秒）")]
+    public float shuffleStabilizationDelay = 0.15f;
+
     [Header("Progress Animation Settings")]
     [Tooltip("進捗スライダーのアニメーション時間")]
     public float progressAnimationDuration = 0.5f;
@@ -464,6 +474,10 @@ public class CryptoGameManager : MonoBehaviour
     
     // 進捗アニメーション管理用
     private Dictionary<int, Coroutine> sliderAnimations = new Dictionary<int, Coroutine>();
+
+    // セットアップ中に回答キューブ等のコライダーを自動で有効化しないためのフラグ
+    // (プレイヤー位置リセットとシャッフル中の誤トリガー防止用)
+    private bool suppressColliderEnableDuringSetup = false;
 
     /// <summary>
     /// Inspector表示用のUI設定状況
@@ -604,7 +618,25 @@ public class CryptoGameManager : MonoBehaviour
         Debug.Log($"  explanationText: {(explanationText != null ? "✅" : "❌")}");
         Debug.Log($"  questionText: {(questionText != null ? "✅" : "❌")}");
         Debug.Log($"  currentScoreText: {(currentScoreText != null ? "✅" : "❌")}");
-        
+
+		// 追加: QuestionText と回答ボタンの確実な可視化（Play 中にオブジェクトが無効化されているケース対策）
+		if (questionText != null)
+		{
+			EnsureTextVisible(questionText);
+		}
+		if (answerButtons != null)
+		{
+			foreach (var b in answerButtons)
+			{
+				if (b == null) continue;
+				b.gameObject.SetActive(true);
+				var btnComp = b.GetComponent<UnityEngine.UI.Button>();
+				if (btnComp != null) btnComp.interactable = true;
+				var txt = b.GetComponentInChildren<Text>(true);
+				if (txt != null) EnsureTextVisible(txt);
+			}
+		}
+
         // 解説パネルの確実な準備
         bool explanationReady = false;
         if (explanationPanel == null || explanationText == null)
@@ -841,7 +873,7 @@ public class CryptoGameManager : MonoBehaviour
                 bodyRT.anchorMax = new Vector2(1f, 1f);
                 bodyRT.pivot = new Vector2(0.5f, 1f);
                 bodyRT.anchoredPosition = new Vector2(0f, -60f);
-                bodyRT.sizeDelta = new Vector2(0f, 200f);
+                bodyRT.sizeDelta = new Vector2(1000f, 300f);
 
                 Debug.Log("解説パネル（ヘッダー＋本文）を動的作成しました");
                 yield return new WaitForSeconds(0.1f);
@@ -880,7 +912,7 @@ public class CryptoGameManager : MonoBehaviour
                         bodyRT.anchorMax = new Vector2(1f, 1f);
                         bodyRT.pivot = new Vector2(0.5f, 1f);
                         bodyRT.anchoredPosition = new Vector2(0f, -60f);
-                        bodyRT.sizeDelta = new Vector2(0f, 200f);
+                        bodyRT.sizeDelta = new Vector2(1000f, 300f);
                     }
                 }
 
@@ -903,6 +935,9 @@ public class CryptoGameManager : MonoBehaviour
         currentStepIndex = 0;
         gameTimer = gameSetDuration;
         isGameActive = true;
+
+        // 追加: タイマー表示を初期化（カウントダウンがすぐに見えるようにする）
+        UpdateTimerText();
         
         // ゲームセットの生成（暗号方式の組み合わせ）
         GenerateGameSet();
@@ -959,49 +994,99 @@ public class CryptoGameManager : MonoBehaviour
     /// </summary>
     private void StartCurrentQuestion()
     {
+        // 変更: 直接処理せず、順序保証のためコルーチンで実行する
+        StartCoroutine(StartCurrentQuestionRoutine());
+    }
+
+    // 新規: StartCurrentQuestion の順序を保証するコルーチン
+    private IEnumerator StartCurrentQuestionRoutine()
+    {
         if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length)
         {
             Debug.Log("ゲームセット完了");
             ShowFinalScore();
-            return;
+            yield break;
         }
-        
+
         CryptoType currentType = currentGameSet[currentQuestionIndex];
 
-        // 公開鍵暗号方式 or ハイブリッド暗号方式の1問目開始前にリセット処理
+        // インタラクションを一旦無効化して、シャッフルや移動で誤入力が発生しないようにする
+        DisableAnswerInteractions();
+
+        // セットアップ開始フラグ: この間、ResetVisualState/ResetCubeRuntimeState はコライダーを有効化しない
+        suppressColliderEnableDuringSetup = true;
+        Debug.Log("StartCurrentQuestionRoutine: suppressColliderEnableDuringSetup = true");
+
+        // プレイヤー位置をまず確実にリセット（これによりプレイヤーがシャッフル中に誤って触れない）
+        if (player != null)
+        {
+            ResetPlayerPosition();
+            Debug.Log("StartCurrentQuestionRoutine: プレイヤー位置を先にリセットしました");
+
+            // 追加: インスペクタで調整可能な遅延を挟むことで
+            // リスポーン完了（ビューの安定や物理の反映）を待ってからシャッフルを行う
+            if (playerRespawnToShuffleDelay > 0f)
+            {
+                Debug.Log($"StartCurrentQuestionRoutine: プレイヤーリスポーン完了後、{playerRespawnToShuffleDelay:F2}s 待機してからシャッフルします");
+                yield return new WaitForSeconds(playerRespawnToShuffleDelay);
+            }
+        }
+
+        // 少し待って物理/Transformの安定を待つ（EndOfFrame）
+        yield return new WaitForEndOfFrame();
+
+        // 公開鍵/ハイブリッド時の事前処理（既存ロジックを維持）
         if ((currentType == CryptoType.PublicKey || currentType == CryptoType.Hybrid) && currentStepIndex == 0 && animationManager != null)
         {
-            // DataCubeを(-5,3,10)に移動（ワールド座標で確実に移動）
             if (animationManager.dataCube != null)
             {
                 animationManager.ForceSetDataCubePosition(new Vector3(-5f, 3f, 10f));
             }
-            // 全ての鍵を非表示
             animationManager.HideAllKeys();
             Debug.Log("公開鍵/ハイブリッド暗号方式1問目開始前: 全ての鍵を非表示");
         }
 
         var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
-        
+
         if (question == null)
         {
             Debug.LogError($"問題データが見つかりません: {currentType}, ステップ {currentStepIndex}");
-            return;
+            // インタラクションは復帰しておく
+            suppressColliderEnableDuringSetup = false;
+            Debug.Log("StartCurrentQuestionRoutine: suppressColliderEnableDuringSetup = false (error path)");
+            EnableAnswerInteractions();
+            yield break;
         }
         
-        // UI更新
+        // UI更新（テキスト可視化含む）
         if (questionText != null)
         {
             questionText.text = question.questionText;
+            EnsureTextVisible(questionText);
         }
         
-        // 暗号方式に応じたアニメーション再生
+        // 暗号方式に応じた UI アニメ再生（非同期ではない想定）
         PlayCryptoTypeAnimation(currentType);
         
-        // 回答キューブをランダム化して設定
+        // 回答キューブをシャッフルして設定（プレイヤーは既にリセット済みなので誤選択を防げる）
         SetRandomizedAnswers(question);
         
-        Debug.Log($"問題開始: {currentType}, ステップ: {currentStepIndex}");
+        // シャッフル後の物理/描画の安定を少し待つ（パラメータ化）
+        yield return new WaitForEndOfFrame();
+        if (shuffleStabilizationDelay > 0f)
+        {
+            Debug.Log($"StartCurrentQuestionRoutine: シャッフル後の安定化を {shuffleStabilizationDelay:F2}s 待機します");
+            yield return new WaitForSeconds(shuffleStabilizationDelay);
+        }
+
+        // セットアップ完了：コライダーの自動有効化を許可してからインタラクションを復帰する
+        suppressColliderEnableDuringSetup = false;
+        Debug.Log("StartCurrentQuestionRoutine: suppressColliderEnableDuringSetup = false (setup complete)");
+
+        // 最後にインタラクションを復帰
+        EnableAnswerInteractions();
+
+        Debug.Log($"問題開始: {currentType}, ステップ: {currentStepIndex} (順序保証済み)");
     }
     
     /// <summary>
@@ -1171,20 +1256,50 @@ public class CryptoGameManager : MonoBehaviour
         // ヘッダー（中央）と本文（左寄せ）を分けて設定する
         if (explanationHeaderText != null)
         {
+            // ヘッダー有効化・テキスト設定（改行は入れない）
             explanationHeaderText.gameObject.SetActive(true);
-            // 正解時は末尾に改行を入れてヘッダーの下に余白を作る
-            explanationHeaderText.text = isCorrect ? "✅ 正解！\n" : "❌ 不正解";
-            // 明示的に中央寄せ／太字を保証
+            explanationHeaderText.text = isCorrect ? "✅ 正解！" : "❌ 不正解";
+
+            // 色を正誤で分ける（正解=緑、不正解=赤）
+            explanationHeaderText.color = isCorrect ? Color.green : Color.red;
+
+            // 確実に中央表示・太字に
             explanationHeaderText.alignment = TextAnchor.MiddleCenter;
             explanationHeaderText.fontStyle = FontStyle.Bold;
-            // ensure header is above body in hierarchy
-            explanationHeaderText.transform.SetAsLastSibling();
+
+            // ヘッダーの RectTransform を確実に設定（パネル上部中央）
+            RectTransform headerRT = explanationHeaderText.GetComponent<RectTransform>();
+            if (headerRT != null)
+            {
+                headerRT.anchorMin = new Vector2(0.5f, 1f);
+                headerRT.anchorMax = new Vector2(0.5f, 1f);
+                headerRT.pivot = new Vector2(0.5f, 1f);
+                headerRT.anchoredPosition = new Vector2(0f, -10f);
+                headerRT.sizeDelta = new Vector2(Mathf.Max(400f, headerRT.sizeDelta.x), 40f);
+            }
+
+            // ヘッダーをパネル内の先頭（上）に移動して本文が下に来るようにする
+            explanationHeaderText.transform.SetAsFirstSibling();
         }
 
         // 本文は選択回答＋解説のみ（GetExplanationBody を使用）
         string body = GetExplanationBody(question, isCorrect, selectedAnswerIndex);
         explanationText.text = body;
         explanationText.gameObject.SetActive(true);
+
+        // 本文の RectTransform をヘッダーの下に来るように調整（既存パネルにも対応）
+        RectTransform bodyRT = explanationText.GetComponent<RectTransform>();
+        if (bodyRT != null)
+        {
+            bodyRT.anchorMin = new Vector2(0f, 1f);
+            bodyRT.anchorMax = new Vector2(1f, 1f);
+            bodyRT.pivot = new Vector2(0.5f, 1f);
+            // ヘッダー高さに応じて下げる（40 はヘッダーの sizeDelta.y を想定）
+            float headerHeight = 40f;
+            bodyRT.anchoredPosition = new Vector2(0f, -(headerHeight + 10f));
+            // 高さはある程度確保
+            bodyRT.sizeDelta = new Vector2(1000f, 300f);
+        }
 
         // パネルを表示
         explanationPanel.SetActive(true);
@@ -1305,388 +1420,752 @@ public class CryptoGameManager : MonoBehaviour
     private void UpdateProgressDisplay()
     {
         if (progressTracker == null) return;
-        
-        // 進度スライダーの更新
+
+        // 各進捗値を取得（ProgressTracker が 0..1 または 0..100 のいずれを返しても扱える）
+        float rawSym = progressTracker.GetProgress(CryptoType.SymmetricKey);
+        float rawPub = progressTracker.GetProgress(CryptoType.PublicKey);
+        float rawHybrid = progressTracker.GetProgress(CryptoType.Hybrid);
+
+        float percentSym = NormalizeToPercent(rawSym);
+        float percentPub = NormalizeToPercent(rawPub);
+        float percentHybrid = NormalizeToPercent(rawHybrid);
+
+        // スライダーが存在する場合はスライダーを 0..100 のレンジで更新（Inspector の設定値に依存せず統一）
         if (progressSliders != null && progressSliders.Length >= 3)
         {
-            progressSliders[0].value = progressTracker.GetProgress(CryptoType.SymmetricKey);
-            progressSliders[1].value = progressTracker.GetProgress(CryptoType.PublicKey);
-            progressSliders[2].value = progressTracker.GetProgress(CryptoType.Hybrid);
+            SetSliderToPercent(progressSliders[0], percentSym);
+            SetSliderToPercent(progressSliders[1], percentPub);
+            SetSliderToPercent(progressSliders[2], percentHybrid);
         }
-        
-        // 進度ラベルの更新
+
+        // 進度ラベルの更新（常にパーセント表記）
         if (progressLabels != null && progressLabels.Length >= 3)
         {
-            progressLabels[0].text = "共通鍵暗号: " + progressTracker.GetProgress(CryptoType.SymmetricKey).ToString("F1") + "%";
-            progressLabels[1].text = "公開鍵暗号: " + progressTracker.GetProgress(CryptoType.PublicKey).ToString("F1") + "%";
-            progressLabels[2].text = "ハイブリッド暗号: " + progressTracker.GetProgress(CryptoType.Hybrid).ToString("F1") + "%";
+            progressLabels[0].text = "共通鍵暗号: " + percentSym.ToString("F1") + "%";
+            progressLabels[1].text = "公開鍵暗号: " + percentPub.ToString("F1") + "%";
+            progressLabels[2].text = "ハイブリッド暗号: " + percentHybrid.ToString("F1") + "%";
         }
-        
-        Debug.Log("進度表示更新完了");
+
+        Debug.Log("進度表示更新完了 （% 表示をスライダーと整合）");
     }
 
     /// <summary>
-    /// 回答キューブにランダムな順序で回答を設定
+    /// raw（0..1 または 0..100）を常に 0..100 のパーセントに変換する
     /// </summary>
-    /// <param name="question">設定する問題データ</param>
-    private void SetRandomizedAnswers(CryptoQuestion question)
+    private float NormalizeToPercent(float raw)
     {
-        // 入力検証
-        if (question == null)
-        {
-            Debug.LogError("[SetRandomizedAnswers] ❌ 問題データがnullです");
-            return;
-        }
+        // raw が 1 より大きければ既にパーセント（0..100）とみなす。
+        if (raw > 1.5f)
+            return Mathf.Clamp(raw, 0f, 100f);
 
-        if (question.answers == null || question.answers.Length == 0)
-        {
-            Debug.LogError("[SetRandomizedAnswers] ❌ 回答データが無効です（null または空の配列）");
-            return;
-        }
-
-        if (question.correctAnswerIndex < 0 || question.correctAnswerIndex >= question.answers.Length)
-        {
-            Debug.LogError("[SetRandomizedAnswers] ❌ 正解インデックスが無効です: " + question.correctAnswerIndex + " (回答数: " + question.answers.Length + ")");
-            return;
-        }
-        
-        if (answerCubes == null)
-        {
-            Debug.LogError("[SetRandomizedAnswers] ❌ 回答キューブ配列がnullです");
-            return;
-        }
-
-        if (answerCubes.Length < question.answers.Length)
-        {
-            Debug.LogError("[SetRandomizedAnswers] ❌ 回答キューブが不足しています。必要: " + question.answers.Length + ", 利用可能: " + answerCubes.Length);
-            return;
-        }
-
-        // null チェック
-        int validCubeCount = 0;
-        for (int i = 0; i < question.answers.Length && i < answerCubes.Length; i++)
-        {
-            if (answerCubes[i] != null)
-            {
-                validCubeCount++;
-            }
-        }
-
-        if (validCubeCount < question.answers.Length)
-        {
-            Debug.LogError("[SetRandomizedAnswers] ❌ 有効な回答キューブが不足しています。必要: " + question.answers.Length + ", 有効: " + validCubeCount);
-            return;
-        }
-
-        if (showAnswerRandomizationDebug)
-        {
-            Debug.Log("[SetRandomizedAnswers] 🎯 回答ランダム化開始");
-            Debug.Log("[SetRandomizedAnswers] 問題: " + question.questionText);
-            Debug.Log("[SetRandomizedAnswers] 回答数: " + question.answers.Length + ", キューブ数: " + answerCubes.Length);
-        }
-        
-        // テスト用の固定シード設定
-        if (useFixedRandomSeed)
-        {
-            UnityEngine.Random.InitState(fixedRandomSeed);
-            if (showAnswerRandomizationDebug)
-            {
-                Debug.Log("[SetRandomizedAnswers] 🔧 固定シードを使用: " + fixedRandomSeed);
-            }
-        }
-        
-        // 回答の順序をランダム化するためのインデックス配列を作成
-        int[] answerIndices = new int[question.answers.Length];
-        for (int i = 0; i < answerIndices.Length; i++)
-        {
-            answerIndices[i] = i;
-        }
-        
-        // Fisher-Yates shuffle でランダム化
-        for (int i = answerIndices.Length - 1; i > 0; i--)
-        {
-            int randomIndex = UnityEngine.Random.Range(0, i + 1);
-            int temp = answerIndices[i];
-            answerIndices[i] = answerIndices[randomIndex];
-            answerIndices[randomIndex] = temp;
-        }
-        
-        if (showAnswerRandomizationDebug)
-        {
-            Debug.Log("[SetRandomizedAnswers] 回答順序: [" + string.Join(", ", answerIndices) + "]");
-            Debug.Log("[SetRandomizedAnswers] 元の回答リスト: [" + string.Join(", ", question.answers) + "]");
-            Debug.Log("[SetRandomizedAnswers] 正解インデックス: " + question.correctAnswerIndex + " (正解: '" + question.answers[question.correctAnswerIndex] + "')");
-        }
-        
-        // ランダム化された順序でキューブに回答を設定
-        int correctCubePosition = -1; // 正解が配置されたキューブの位置を記録
-        
-        for (int cubeIndex = 0; cubeIndex < question.answers.Length && cubeIndex < answerCubes.Length; cubeIndex++)
-        {
-            if (answerCubes[cubeIndex] != null)
-            {
-                int answerIndex = answerIndices[cubeIndex];
-                string answerText = question.answers[answerIndex];
-                bool isCorrect = (answerIndex == question.correctAnswerIndex);
-                
-                answerCubes[cubeIndex].SetAnswerText(answerText);
-                answerCubes[cubeIndex].SetAnswerIndex(answerIndex);
-                answerCubes[cubeIndex].SetActive(true);
-                
-                if (isCorrect)
-                {
-                    correctCubePosition = cubeIndex;
-                }
-                
-                if (showAnswerRandomizationDebug)
-                {
-                    Vector3 cubePos = answerCubes[cubeIndex].transform.position;
-                    Debug.Log("キューブ " + cubeIndex + " 設定完了: '" + answerText + "' (元インデックス: " + answerIndex + ") " + (isCorrect ? "✅正解" : "❌") + " - 位置: " + cubePos);
-                }
-            }
-            else
-            {
-                Debug.LogError("Answer Cube " + cubeIndex + " が null です");
-            }
-        }
-        
-        // 使用しないキューブを非表示
-        for (int i = question.answers.Length; i < answerCubes.Length; i++)
-        {
-            if (answerCubes[i] != null)
-            {
-                answerCubes[i].SetActive(false);
-                if (showAnswerRandomizationDebug)
-                {
-                    Debug.Log("キューブ " + i + " を非表示にしました");
-                }
-            }
-        }
-        
-        if (showAnswerRandomizationDebug)
-        {
-            string correctAnswerText = question.answers[question.correctAnswerIndex];
-            Debug.Log("[SetRandomizedAnswers] ✅ 回答ランダム化完了");
-            Debug.Log("[SetRandomizedAnswers] 正解: 「" + correctAnswerText + "」がキューブ " + correctCubePosition + " に配置されました");
-            Debug.Log("[SetRandomizedAnswers] プレイヤーは位置を覚えられません - 毎回ランダムです！");
-        }
+        // それ以外は 0..1 と見なして 100倍して clamp
+        return Mathf.Clamp01(raw) * 100f;
     }
 
     /// <summary>
-    /// 結果メッセージの表示（正解・不正解）
+    /// スライダーを 0..100 の範囲に統一して値をセットする（null チェック含む）
     /// </summary>
-    private void ShowResultMessage(string message, Color color)
+    private void SetSliderToPercent(Slider s, float percent)
     {
-        // ResultText は UI 上で使わない運用に変更しました。
-        // 必要ならログ出力のみ行う（実際の表示は解説パネル側で行う）
-        Debug.Log($"結果メッセージ(非表示運用): {message}");
+        if (s == null) return;
+
+        s.minValue = 0f;
+        s.maxValue = 100f;
+        s.wholeNumbers = false;
+        // 値を代入（Clamp により安全）
+        s.value = Mathf.Clamp(percent, s.minValue, s.maxValue);
     }
     
-    /// <summary>
-    /// プレイヤー位置のリセット
-    /// </summary>
-    private void ResetPlayerPosition()
-    {
-        if (player == null)
-        {
-            Debug.LogWarning("プレイヤーオブジェクトが設定されていません");
-            return;
-        }
-        
-        Vector3 resetPos = resetSettings.customPosition;
-        
-        switch (resetSettings.resetType)
-        {
-            case ResetPositionType.Custom:
-                resetPos = resetSettings.customPosition;
-                break;
-            case ResetPositionType.Preset:
-                resetPos = GetPresetPosition(resetSettings.presetPosition);
-                break;
-            case ResetPositionType.Transform:
-                if (resetSettings.referenceTransform != null)
-                {
-                    resetPos = resetSettings.referenceTransform.position;
-                }
-                else
-                {
-                    Debug.LogWarning("参照Transformが設定されていません。カスタム位置を使用します");
-                    resetPos = resetSettings.customPosition;
-                }
-                break;
-        }
-        
-        // 高さ調整
-        if (resetSettings.useGroundDetection)
-        {
-            RaycastHit hit;
-            Vector3 rayStart = new Vector3(resetPos.x, resetPos.y + 10, resetPos.z);
-            if (Physics.Raycast(rayStart, Vector3.down, out hit, resetSettings.groundDetectionDistance))
-            {
-                resetPos.y = hit.point.y + resetSettings.heightOffset;
-                Debug.Log("地面検出成功: 高さ " + resetPos.y);
-            }
-            else
-            {
-                Debug.LogWarning("地面検出失敗。設定位置をそのまま使用します");
-                if (resetSettings.forceHeightOffset)
-                {
-                    resetPos.y += resetSettings.heightOffset;
-                }
-            }
-        }
-        else if (resetSettings.forceHeightOffset)
-        {
-            resetPos.y += resetSettings.heightOffset;
-        }
-        
-        // CharacterControllerの場合は一時的に無効化
-        CharacterController cc = player.GetComponent<CharacterController>();
-        bool ccWasEnabled = false;
-        if (cc != null)
-        {
-            ccWasEnabled = cc.enabled;
-            cc.enabled = false;
-        }
-        
-        // 位置をリセット
-        player.position = resetPos;
-        
-        // 向きリセット
-        if (resetSettings.resetRotation)
-        {
-            player.rotation = Quaternion.Euler(resetSettings.resetRotationEuler);
-        }
-        
-        // CharacterControllerを再有効化
-        if (cc != null && ccWasEnabled)
-        {
-            cc.enabled = true;
-        }
-        
-        Debug.Log("プレイヤー位置リセット完了: " + resetPos);
-    }
-    
-    /// <summary>
-    /// プリセット位置の取得
-    /// </summary>
-    private Vector3 GetPresetPosition(PresetPosition preset)
-    {
-        switch (preset)
-        {
-            case PresetPosition.Center: return new Vector3(0, 3, 5);
-            case PresetPosition.FarCenter: return new Vector3(0, 3, 10);
-            case PresetPosition.LeftSide: return new Vector3(-5, 3, 5);
-            case PresetPosition.RightSide: return new Vector3(5, 3, 5);
-            case PresetPosition.HighCenter: return new Vector3(0, 8, 5);
-            case PresetPosition.StartPosition: return new Vector3(0, 1, 0);
-            default: return new Vector3(0, 3, 5);
-        }
-    }
-    
-    /// <summary>
-    /// 次の問題開始の遅延
-    /// </summary>
-    private IEnumerator StartNextQuestionDelay()
-    {
-        yield return new WaitForSeconds(1.0f);
-        StartCurrentQuestion();
-    }
+    /// 以下、他スクリプトから呼ばれる未定義メソッドの最小実装を追加します。
 
-    /// <summary>
-    /// 回答が選択された時の処理（CryptoAnswerCubeから呼ばれる）
-    /// </summary>
-    public void OnAnswerSelected(int selectedAnswerIndex)
-    {
-        if (!isGameActive)
-        {
-            Debug.LogWarning("ゲームが非アクティブ状態のため、回答選択を無視します");
-            return;
-        }
-        
-        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length)
-        {
-            Debug.LogError("OnAnswerSelected: 無効なゲーム状態です");
-            return;
-        }
-        
-        // 現在の問題情報を取得
-        CryptoType currentType = currentGameSet[currentQuestionIndex];
-        var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
-        
-        if (question == null)
-        {
-            Debug.LogError("OnAnswerSelected: 問題データの取得に失敗しました");
-            return;
-        }
-        
-        Debug.Log("[OnAnswerSelected] 選択された回答: インデックス " + selectedAnswerIndex);
-        Debug.Log("[OnAnswerSelected] 正解インデックス: " + question.correctAnswerIndex);
-        Debug.Log("[OnAnswerSelected] 現在の問題: " + currentType + ", ステップ: " + currentStepIndex);
-        
-        // 回答をチェックして処理
-        bool isCorrect = (selectedAnswerIndex == question.correctAnswerIndex);
-        
-        if (isCorrect)
-        {
-            Debug.Log("✅ 正解!");
-            OnCorrectAnswer(selectedAnswerIndex);
-        }
-        else
-        {
-            Debug.Log("❌ 不正解...");
-            OnIncorrectAnswerSelected(selectedAnswerIndex);
-        }
-    }
-
-    /// <summary>
-    /// 不正解後の遅延処理
-    /// </summary>
-    private IEnumerator HandleIncorrectAnswerDelay()
-    {
-        // 2秒間待機
-        yield return new WaitForSeconds(2.0f);
-        
-        // 同じ問題を再表示する場合
-        if (currentGameSet != null && currentQuestionIndex < currentGameSet.Length)
-        {
-            Debug.Log("[HandleIncorrectAnswerDelay] 同じ問題を再表示します");
-            StartCurrentQuestion(); // 同じ問題を再表示（答えは再ランダム化される）
-        }
-    }
-
-    /// <summary>
-    /// プレイヤー入力を無効化
-    /// </summary>
+    // プレイヤー入力を無効化（Enter待ちなどで使用）
     private void DisablePlayerInput()
     {
         if (playerInput != null)
         {
-            playerInput.SetInputEnabled(false);
-            Debug.Log("プレイヤー入力を無効化しました");
+            try { playerInput.enabled = false; } catch { /* コンポーネントに enabled がない場合無視 */ }
         }
-        else
-        {
-            Debug.LogWarning("PlayerInputコンポーネントが見つかりません - 入力制御をスキップ");
-        }
+        // カーソルの復帰（UI操作用）
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
     }
-    
-    /// <summary>
-    /// プレイヤー入力を有効化
-    /// </summary>
+
+    // プレイヤー入力を有効化（ゲーム再開時など）
     private void EnablePlayerInput()
     {
         if (playerInput != null)
         {
-            playerInput.SetInputEnabled(true);
-            Debug.Log("プレイヤー入力を有効化しました");
+            try { playerInput.enabled = true; } catch { /* ignore */ }
+        }
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
+    }
+
+    // 回答の相互作用を無効化（問題表示中の誤操作防止）
+    private void DisableAnswerInteractions()
+    {
+        // UIボタン無効化
+        if (answerButtons != null)
+        {
+            foreach (var btn in answerButtons)
+            {
+                if (btn == null) continue;
+                try { btn.interactable = false; } catch { }
+            }
+        }
+
+        // 3Dキューブのコライダーを無効化して選択できないようにする
+        if (answerCubes != null)
+        {
+            foreach (var cube in answerCubes)
+            {
+                if (cube == null || cube.gameObject == null) continue;
+                try
+                {
+                    foreach (var col in cube.GetComponentsInChildren<Collider>(true))
+                    {
+                        if (col != null) col.enabled = false;
+                    }
+                }
+                catch { }
+            }
+        }
+
+        Debug.Log("DisableAnswerInteractions: 回答の相互作用を無効化しました");
+    }
+    
+    // 回答の相互作用を有効化（問題応答受付を再開）
+    private void EnableAnswerInteractions()
+    {
+        // UIボタンを有効化（既存の onClick リスナーは維持）
+        if (answerButtons != null)
+        {
+            foreach (var btn in answerButtons)
+            {
+                if (btn == null) continue;
+                try { btn.interactable = true; } catch { }
+                // ボタンが非表示になっている場合は表示しておく（UI の意図に従って適宜調整可能）
+                try { if (!btn.gameObject.activeSelf) btn.gameObject.SetActive(true); } catch { }
+            }
+        }
+
+        // 3Dキューブのコライダーを有効化して選択可能にする
+        if (answerCubes != null)
+        {
+            foreach (var cube in answerCubes)
+            {
+                if (cube == null || cube.gameObject == null) continue;
+                try
+                {
+                    foreach (var col in cube.GetComponentsInChildren<Collider>(true))
+                    {
+                        if (col != null) col.enabled = true;
+                    }
+                }
+                catch { }
+            }
+        }
+
+        Debug.Log("EnableAnswerInteractions: 回答の相互作用を有効化しました");
+    }
+
+    // 外部 UI / キューブ等から回答が選択された時に呼ばれる共通入口
+    // selectedIndex は表示上の回答インデックス（SetRandomizedAnswers 実装に合わせる必要あり）
+    public void OnAnswerSelected(int selectedIndex)
+    {
+        if (currentGameSet == null || currentQuestionIndex >= currentGameSet.Length)
+        {
+            Debug.LogWarning("OnAnswerSelected: 無効なゲーム状態");
+            return;
+        }
+
+        CryptoType currentType = currentGameSet[currentQuestionIndex];
+        var question = CryptoQuestionDatabase.GetQuestion(currentType, currentStepIndex);
+        if (question == null)
+        {
+            Debug.LogWarning("OnAnswerSelected: 問題データが見つかりません");
+            return;
+        }
+
+        // 単純判定: 選択インデックスと question.correctAnswerIndex を比較
+        if (selectedIndex == question.correctAnswerIndex)
+        {
+            OnCorrectAnswer(selectedIndex);
         }
         else
         {
-            Debug.LogWarning("PlayerInputコンポーネントが見つかりません - 入力制御をスキップ");
+            OnIncorrectAnswerSelected(selectedIndex);
         }
     }
 
-    // 注意: ここに残っていた不完全な #if UNITY_EDITOR ブロック（MenuItem 定義）を削除しました。
-    //       エディタ専用のメニュー追加が必要な場合は、Assets/.../Editor フォルダに別ファイルを作成してください。
+    // 回答候補（キューブ・ボタン）をランダム化して設定する簡易実装
+    private void SetRandomizedAnswers(CryptoQuestion question)
+    {
+	if (question == null) return;
+
+	// Try to refresh any null entries in answerCubes array from the scene
+	TryRefreshAnswerCubes();
+
+	// Shuffle indices (fixed seed optional)
+	List<int> order = Enumerable.Range(0, question.answers.Length).ToList();
+	if (useFixedRandomSeed)
+	{
+		System.Random rng = new System.Random(fixedRandomSeed);
+		order = order.OrderBy(_ => rng.Next()).ToList();
+	}
+	else
+	{
+		order = order.OrderBy(_ => UnityEngine.Random.value).ToList();
+	}
+
+	// Collect available cubes (non-null)
+	List<CryptoAnswerCube> availableCubes = new List<CryptoAnswerCube>();
+	if (answerCubes != null)
+	{
+		foreach (var c in answerCubes)
+		{
+			if (c != null) availableCubes.Add(c);
+		}
+	}
+
+	int idx = 0;
+
+	// Assign to 3D cubes first (as many as available)
+	for (; idx < availableCubes.Count && idx < order.Count; idx++)
+	{
+		var cube = availableCubes[idx];
+		int srcIdx = order[idx];
+		string ansText = question.answers[srcIdx];
+
+		// --- 追加: キューブのランタイム状態を強制リセット（選択済みフラグや無効化されたコンポーネントを復帰） ---
+		ResetCubeRuntimeState(cube);
+
+		// Update script properties
+		cube.answerText = ansText;
+		cube.answerIndex = srcIdx;
+
+		// Update child UI/TextMesh if present
+		var uiText = cube.GetComponentInChildren<Text>(true);
+		if (uiText != null)
+		{
+			uiText.text = ansText;
+			EnsureTextVisible(uiText);
+		}
+		var textMesh = cube.GetComponentInChildren<TextMesh>(true);
+		if (textMesh != null)
+		{
+			textMesh.text = ansText;
+			textMesh.gameObject.SetActive(true);
+		}
+
+		// Ensure visible and interactive
+		cube.gameObject.SetActive(true);
+		ResetVisualState(cube.gameObject);
+	}
+
+	// If more answers remain, use UI buttons as fallback
+	for (int j = idx; j < order.Count; j++)
+	{
+		int srcIdx = order[j];
+		string ansText = question.answers[srcIdx];
+		int buttonSlot = j - idx; // map remaining answers to buttons sequentially
+
+		// Prefer matching button index if available
+		if (answerButtons != null && buttonSlot < answerButtons.Length)
+		{
+			var btn = answerButtons[buttonSlot];
+			if (btn != null)
+			{
+				var txt = btn.GetComponentInChildren<Text>(true);
+				if (txt != null)
+				{
+					txt.text = ansText;
+					EnsureTextVisible(txt);
+				}
+				btn.onClick.RemoveAllListeners();
+				int captured = srcIdx;
+				btn.onClick.AddListener(() => OnAnswerSelected(captured));
+				btn.gameObject.SetActive(true);
+				ResetVisualState(btn.gameObject);
+				var btnComp = btn.GetComponent<UnityEngine.UI.Button>();
+				if (btnComp != null) btnComp.interactable = true;
+				continue;
+			}
+		}
+
+		// If no button slot is available, log (should not happen if UI configured)
+		Debug.LogWarning("[SetRandomizedAnswers] 回答割当先不足 - インデックス: " + srcIdx);
+	}
+
+	// Hide any extra cubes beyond availableAnswers (safety)
+	// ここもキューブを隠す前に内部フラグをクリアしておく
+	if (availableCubes.Count > order.Count)
+	{
+		for (int k = order.Count; k < availableCubes.Count; k++)
+		{
+			if (availableCubes[k] != null)
+			{
+				ResetCubeRuntimeState(availableCubes[k]); // 追加：内部状態クリア
+				availableCubes[k].gameObject.SetActive(false);
+			}
+		}
+	}
+
+	// If there are more button slots than needed, hide the extras
+	if (answerButtons != null)
+	{
+		int usedButtons = Mathf.Max(0, order.Count - availableCubes.Count);
+		for (int b = usedButtons; b < answerButtons.Length; b++)
+		{
+			if (answerButtons[b] != null)
+			{
+				// keep any buttons used (0..usedButtons-1), hide the rest
+				if (b >= usedButtons) answerButtons[b].gameObject.SetActive(false);
+			}
+		}
+	}
+
+	if (showAnswerRandomizationDebug)
+	{
+		Debug.Log($"SetRandomizedAnswers: 配置順 = [{string.Join(", ", order)}], cubesAvailable={availableCubes.Count}, buttonsAvailable={(answerButtons!=null?answerButtons.Length:0)}");
+	}
 }
+
+// Try to refill null entries in answerCubes from the scene (non-destructive)
+private void TryRefreshAnswerCubes()
+{
+	if (answerCubes == null) return;
+
+	// If any slot is null, attempt to find CryptoAnswerCube components in scene and refill empty slots
+	bool anyNull = false;
+	for (int i = 0; i < answerCubes.Length; i++)
+	{
+		if (answerCubes[i] == null)
+		{
+			anyNull = true;
+			break;
+		}
+	}
+	if (!anyNull) return;
+
+	var sceneCubes = UnityEngine.Object.FindObjectsOfType<CryptoAnswerCube>(true);
+	if (sceneCubes == null || sceneCubes.Length == 0) return;
+
+	// Try to fill null slots with scene instances not already referenced
+	HashSet<CryptoAnswerCube> referenced = new HashSet<CryptoAnswerCube>();
+	foreach (var c in answerCubes) if (c != null) referenced.Add(c);
+	int si = 0;
+	for (int i = 0; i < answerCubes.Length && si < sceneCubes.Length; i++)
+	{
+		if (answerCubes[i] == null)
+		{
+			// find next scene cube not referenced
+			while (si < sceneCubes.Length && referenced.Contains(sceneCubes[si])) si++;
+			if (si < sceneCubes.Length)
+			{
+				answerCubes[i] = sceneCubes[si];
+				referenced.Add(sceneCubes[si]);
+				si++;
+			}
+		}
+	}
+}
+
+// --- 追加: テキストと可視状態を確実に復帰させるヘルパー ---
+private void EnsureTextVisible(Text txt)
+{
+	if (txt == null) return;
+
+	// GameObject とコンポーネントを有効化
+	if (!txt.gameObject.activeSelf) txt.gameObject.SetActive(true);
+	try { txt.enabled = true; } catch { /* コンポーネントに enabled がない場合無視 */ }
+
+	// 透明になっていたら alpha を復帰
+	Color c = txt.color;
+	if (c.a <= 0.01f)
+	{
+		c.a = 1f;
+		txt.color = c;
+	}
+
+	// 親 Canvas / CanvasGroup を有効化
+	var parentCanvas = txt.GetComponentInParent<Canvas>(true);
+	if (parentCanvas != null && !parentCanvas.gameObject.activeSelf)
+	{
+		parentCanvas.gameObject.SetActive(true);
+	}
+	foreach (var cg in txt.GetComponentsInParent<CanvasGroup>(true))
+	{
+		try
+		{
+			cg.alpha = 1f;
+			cg.interactable = true;
+			cg.blocksRaycasts = true;
+		}
+		catch { }
+	}
+
+	// CanvasRenderer の復帰
+	foreach (var cr in txt.GetComponentsInChildren<CanvasRenderer>(true))
+	{
+		try { cr.gameObject.SetActive(true); } catch { }
+	}
+}
+
+// --- 追加: GameObject とその子供の表示/相互作用コンポーネントを復帰 ---
+private void ResetVisualState(GameObject go)
+{
+	if (go == null) return;
+
+	// GameObject 自体
+	if (!go.activeSelf) go.SetActive(true);
+
+	// Renderer 系（MeshRenderer, SkinnedMeshRenderer, SpriteRenderer 等）
+	foreach (var r in go.GetComponentsInChildren<Renderer>(true))
+	{
+		try { r.enabled = true; } catch { }
+	}
+
+	// UI Graphic（Text, Image, RawImage 等）
+	foreach (var g in go.GetComponentsInChildren<UnityEngine.UI.Graphic>(true))
+	{
+		try { g.enabled = true; } catch { }
+	}
+
+	// CanvasRenderer を有効化（UI 表示補助）
+	foreach (var cr in go.GetComponentsInChildren<CanvasRenderer>(true))
+	{
+		try { cr.gameObject.SetActive(true); } catch { }
+	}
+
+	// Collider を有効化（選択判定の復帰）
+	// 注意: セットアップ中はコライダーの自動有効化を抑止する
+	foreach (var col in go.GetComponentsInChildren<Collider>(true))
+	{
+		try
+		{
+			if (!suppressColliderEnableDuringSetup) col.enabled = true;
+			else col.enabled = false; // 明示的に無効化しておく（安全策）
+		}
+		catch { }
+	}
+
+	// Animator を有効化
+	foreach (var anim in go.GetComponentsInChildren<Animator>(true))
+	{
+		try { anim.enabled = true; } catch { }
+	}
+
+	// CanvasGroup の復帰
+	foreach (var cg in go.GetComponentsInChildren<CanvasGroup>(true))
+	{
+		try
+		{
+			cg.alpha = 1f;
+			cg.interactable = true;
+			cg.blocksRaycasts = true;
+		}
+		catch { }
+	}
+
+	// 親 Canvas の復帰（念のため）
+	var parentCanvas = go.GetComponentInParent<Canvas>(true);
+	if (parentCanvas != null && !parentCanvas.gameObject.activeSelf)
+	{
+		try { parentCanvas.gameObject.SetActive(true); } catch { }
+	}
+}
+
+// --- 新規追加メソッド: 各 CryptoAnswerCube のランタイム状態を可能な限り復帰させる ---
+private void ResetCubeRuntimeState(CryptoAnswerCube cube)
+{
+	if (cube == null) return;
+
+	GameObject go = cube.gameObject;
+
+	// 1) 共通コンポーネントの復帰
+	try { if (!go.activeSelf) go.SetActive(true); } catch { }
+	ResetVisualState(go);
+
+	// 2) MonoBehaviour コンポーネントを有効化（スクリプトが無効化されている場合の復帰）
+	foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true))
+	{
+		try { mb.enabled = true; } catch { }
+	}
+
+	// 3) 反射で「使用済み」フラグ等の bool フィールドを false に戻す
+	foreach (var mb in go.GetComponentsInChildren<MonoBehaviour>(true))
+	{
+		var t = mb.GetType();
+		// よくあるフィールド名パターンを探索して false にする
+		foreach (var f in t.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+		{
+			if (f.FieldType == typeof(bool))
+			{
+				string n = f.Name.ToLower();
+				if (n.Contains("used") || n.Contains("selected") || n.Contains("isused") || n.Contains("isselected") || n.Contains("consumed"))
+				{
+					try { f.SetValue(mb, false); } catch { }
+				}
+			}
+		}
+		// また、property もチェック
+		foreach (var p in t.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+		{
+			if (!p.CanWrite) continue;
+			if (p.PropertyType == typeof(bool))
+			{
+				string n = p.Name.ToLower();
+				if (n.Contains("used") || n.Contains("selected") || n.Contains("consumed"))
+				{
+					try { p.SetValue(mb, false, null); } catch { }
+				}
+			}
+		}
+		// メソッドで復帰可能なら呼ぶ（ResetState, Restore, Initialize 等）
+		string[] methodNames = new string[] { "ResetState", "Restore", "Initialize", "Reset", "ClearState", "Refresh" };
+		foreach (var mn in methodNames)
+		{
+			var mi = t.GetMethod(mn, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+			if (mi != null && mi.GetParameters().Length == 0)
+			{
+				try { mi.Invoke(mb, null); } catch { }
+			}
+		}
+	}
+
+	// 4) Collider等を再有効化（保険）
+	foreach (var col in go.GetComponentsInChildren<Collider>(true))
+	{
+		try
+		{
+			// セットアップ中はここで有効化しない（StartCurrentQuestionRoutine の終了時に EnableAnswerInteractions が確実に有効化する）
+			if (!suppressColliderEnableDuringSetup) col.enabled = true;
+			else col.enabled = false;
+		}
+		catch { }
+	}
+	// 5) Rigidbody の kinematic を触らないが存在確認（保険）
+	foreach (var rb in go.GetComponentsInChildren<Rigidbody>(true))
+	{
+		try { /* no-op */ } catch { }
+	}
+}
+
+// 追加: 結果表示・プレイヤーリセット・遅延処理の最小実装（不足していたため追加）
+	private void ShowResultMessage(string message, Color color)
+	{
+		if (resultPanel != null)
+			resultPanel.SetActive(true);
+
+		if (resultText != null)
+		{
+			resultText.text = message;
+			try { resultText.color = color; } catch { }
+		}
+
+		Debug.Log("ShowResultMessage: " + message);
+
+		// 自動で結果パネルを短時間後に閉じる（必要なら delay を調整）
+		StartCoroutine(HideResultPanelAfterDelay(2f));
+	}
+
+	private IEnumerator HideResultPanelAfterDelay(float delay)
+	{
+		yield return new WaitForSeconds(delay);
+		if (resultPanel != null)
+			resultPanel.SetActive(false);
+	}
+
+	private void ResetPlayerPosition()
+	{
+		if (player == null) return;
+
+		Vector3 targetPos = player.position;
+		Quaternion targetRot = player.rotation;
+
+		// 基本位置決定
+		switch (resetSettings.resetType)
+		{
+			case ResetPositionType.Custom:
+				targetPos = resetSettings.customPosition;
+				break;
+			case ResetPositionType.Preset:
+				switch (resetSettings.presetPosition)
+				{
+					case PresetPosition.Center: targetPos = new Vector3(0f, 3f, 5f); break;
+					case PresetPosition.FarCenter: targetPos = new Vector3(0f, 3f, 10f); break;
+					case PresetPosition.LeftSide: targetPos = new Vector3(-5f, 3f, 5f); break;
+					case PresetPosition.RightSide: targetPos = new Vector3(5f, 3f, 5f); break;
+					case PresetPosition.HighCenter: targetPos = new Vector3(0f, 8f, 5f); break;
+					case PresetPosition.StartPosition: targetPos = new Vector3(0f, 1f, 0f); break;
+				}
+				break;
+			case ResetPositionType.Transform:
+				if (resetSettings.referenceTransform != null)
+				{
+					targetPos = resetSettings.referenceTransform.position;
+					targetRot = resetSettings.referenceTransform.rotation;
+				}
+				break;
+		}
+
+		// 地面検出/オフセット
+		if (resetSettings.useGroundDetection)
+		{
+			RaycastHit hit;
+			float rayStartY = targetPos.y + resetSettings.groundDetectionDistance;
+			if (Physics.Raycast(new Vector3(targetPos.x, rayStartY, targetPos.z), Vector3.down, out hit, resetSettings.groundDetectionDistance + 1f))
+			{
+				targetPos.y = hit.point.y + resetSettings.heightOffset;
+			}
+			else if (resetSettings.forceHeightOffset)
+			{
+				targetPos.y += resetSettings.heightOffset;
+			}
+		}
+		else if (resetSettings.forceHeightOffset)
+		{
+			targetPos.y += resetSettings.heightOffset;
+		}
+
+		// 向きリセット
+		if (resetSettings.resetRotation)
+		{
+			targetRot = Quaternion.Euler(resetSettings.resetRotationEuler);
+		}
+
+		player.position = targetPos;
+		player.rotation = targetRot;
+	}
+
+	private IEnumerator HandleIncorrectAnswerDelay()
+	{
+		// 不正解後の短い遅延後に同じ問題を再表示
+		yield return new WaitForSeconds(1.5f);
+		StartCurrentQuestion();
+	}
+
+	private IEnumerator StartNextQuestionDelay()
+	{
+		// 正解後の短い遅延後に次の問題を開始
+		yield return new WaitForSeconds(1.0f);
+		StartCurrentQuestion();
+	}
+
+	// --- 追加: 毎フレームでタイマーを減算し表示更新、タイムアップで結果表示へ ---
+	private void Update()
+	{
+		if (!isGameActive) return;
+
+		if (gameTimer > 0f)
+		{
+			gameTimer -= Time.deltaTime;
+			if (gameTimer <= 0f)
+			{
+				gameTimer = 0f;
+				isGameActive = false;
+				UpdateTimerText();
+				Debug.Log("タイムアップ: ゲーム終了処理を開始します");
+
+				// 変更: タイムアップ時の残問題を不正解として扱う処理を呼ぶ
+				HandleTimeUp();
+
+				ShowFinalScore();
+			}
+			else
+			{
+				UpdateTimerText();
+			}
+		}
+	}
+
+	// --- 新規追加: タイムアップ時に残っている全てのステップを不正解としてカウントし、進捗/スコアに反映 ---
+	private void HandleTimeUp()
+	{
+		// 必要情報がなければ何もしない
+		if (currentGameSet == null || currentGameSet.Length == 0)
+		{
+			Debug.LogWarning("HandleTimeUp: 現在のゲームセットが未設定のため残り不正解処理をスキップします");
+			return;
+		}
+
+		// 全体のステップ数（各暗号方式ごとの問題数）を算出
+		int totalStepsInSet = 0;
+		for (int i = 0; i < currentGameSet.Length; i++)
+		{
+			try
+			{
+				int cnt = CryptoQuestionDatabase.GetQuestionCount(currentGameSet[i]);
+				totalStepsInSet += Mathf.Max(0, cnt);
+			}
+			catch (Exception ex)
+			{
+				Debug.LogWarning($"HandleTimeUp: GetQuestionCount 取得中に例外 (index {i}): {ex.Message}");
+			}
+		}
+
+		// 既に回答済み（正誤含む）のステップ数は totalQuestions
+		int remaining = Mathf.Max(0, totalStepsInSet - totalQuestions);
+		if (remaining <= 0)
+		{
+			Debug.Log("HandleTimeUp: 未回答はありません");
+			return;
+		}
+
+		Debug.Log($"HandleTimeUp: 未回答ステップを不正解としてカウントします（残り: {remaining}）");
+
+		// 進捗トラッカーへ各残ステップを不正解として通知する
+		if (progressTracker != null)
+		{
+			// 残りのステップを currentQuestionIndex/currentStepIndex から順に列挙してトラッキング
+			for (int qi = currentQuestionIndex; qi < currentGameSet.Length; qi++)
+			{
+				CryptoType type = currentGameSet[qi];
+				int startStep = (qi == currentQuestionIndex) ? currentStepIndex : 0;
+				int cnt = 0;
+				try { cnt = Mathf.Max(0, CryptoQuestionDatabase.GetQuestionCount(type)); } catch { cnt = 0; }
+
+				for (int s = startStep; s < cnt; s++)
+				{
+					try
+					{
+						progressTracker.OnIncorrectAnswer(type);
+					}
+					catch (Exception ex)
+					{
+						Debug.LogWarning($"HandleTimeUp: progressTracker.OnIncorrectAnswer で例外 ({type}): {ex.Message}");
+					}
+				}
+			}
+		}
+
+		// スコアに不正解分をまとめて適用（負にならないように clamp）
+		int totalPenalty = pointsPerIncorrect * remaining; // pointsPerIncorrect は負の値の想定
+		currentScore = Mathf.Max(0, currentScore + totalPenalty);
+
+		// 総問題数を増やす（正解数は変わらない）
+		totalQuestions += remaining;
+
+		// スコア表示更新
+		UpdateScoreDisplay();
+
+		Debug.Log($"HandleTimeUp: 不正解で減点適用: {totalPenalty} (残り{remaining}) -> currentScore={currentScore}, totalQuestions={totalQuestions}");
+	}
+
+	// --- 追加: タイマー表示更新ヘルパー ---
+	private void UpdateTimerText()
+	{
+		if (timerText == null) return;
+		timerText.text = FormatTime(gameTimer);
+	}
+
+	// --- 追加: 秒→mm:ss 変換 ---
+	private string FormatTime(float seconds)
+	{
+		int totalSec = Mathf.Max(0, Mathf.CeilToInt(seconds));
+		int minutes = totalSec / 60;
+		int secs = totalSec % 60;
+		return string.Format("{0:00}:{1:00}", minutes, secs);
+	}
+} // class end

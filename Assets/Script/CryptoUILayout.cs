@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -34,6 +35,74 @@ public class CryptoUILayout : MonoBehaviour
     public Slider[] progressSliders;
     public Text[] progressLabels;
     
+    // 保存用のシンプルな構造体
+    private struct RectTransformState
+    {
+        public Vector2 anchorMin;
+        public Vector2 anchorMax;
+        public Vector2 pivot;
+        public Vector2 anchoredPosition;
+        public Vector2 sizeDelta;
+    }
+
+    // Inspectorで割り当てられたRectTransformの初期状態を保持するディクショナリ
+    private Dictionary<RectTransform, RectTransformState> savedRectStates = new Dictionary<RectTransform, RectTransformState>();
+
+    private void Awake()
+    {
+        // タイマー
+        if (timerText != null)
+        {
+            CaptureRectState(timerText.GetComponent<RectTransform>());
+        }
+
+        // 質問テキスト
+        if (questionText != null)
+        {
+            CaptureRectState(questionText.GetComponent<RectTransform>());
+        }
+
+        // 回答ボタン群
+        if (answerButtons != null)
+        {
+            for (int i = 0; i < answerButtons.Length; i++)
+            {
+                if (answerButtons[i] != null)
+                {
+                    CaptureRectState(answerButtons[i].GetComponent<RectTransform>());
+                }
+            }
+        }
+
+        // プログレスパネル
+        if (progressPanel != null)
+        {
+            CaptureRectState(progressPanel.GetComponent<RectTransform>());
+        }
+
+        // プログレススライダーとラベル
+        if (progressSliders != null)
+        {
+            for (int i = 0; i < progressSliders.Length; i++)
+            {
+                if (progressSliders[i] != null)
+                {
+                    CaptureRectState(progressSliders[i].GetComponent<RectTransform>());
+                }
+            }
+        }
+        if (progressLabels != null)
+        {
+            for (int i = 0; i < progressLabels.Length; i++)
+            {
+                if (progressLabels[i] != null)
+                {
+                    CaptureRectState(progressLabels[i].GetComponent<RectTransform>());
+                }
+            }
+        }
+    }
+
     private void Start()
     {
         // 優先 : Inspector から直接割り当てられていればそれを使う（旧来の Inspector 互換性）
@@ -46,7 +115,20 @@ public class CryptoUILayout : MonoBehaviour
                 progressTextRef = uiManager.progressText;
             }
         }
-        
+
+        // progressTextRef が Start 時点で見つかった場合、まだ保存していなければキャプチャしておく
+        if (preserveCustomSettings && progressTextRef != null)
+        {
+            var progressRect = progressTextRef.GetComponent<RectTransform>();
+            if (!savedRectStates.ContainsKey(progressRect))
+            {
+                CaptureRectState(progressRect);
+            }
+
+            // 保存した状態を再適用（他の処理で上書きされてしまった場合に戻す）
+            ReapplySavedRectStates();
+        }
+
         if (autoSetupLayout)
         {
             SetupUILayout();
@@ -299,6 +381,40 @@ public class CryptoUILayout : MonoBehaviour
         else
         {
             Debug.LogWarning("preserveCustomSettings が false です。true に設定してください。");
+        }
+    }
+
+    // RectTransform の状態を保存するユーティリティ
+    private void CaptureRectState(RectTransform rt)
+    {
+        if (rt == null) return;
+        RectTransformState state = new RectTransformState
+        {
+            anchorMin = rt.anchorMin,
+            anchorMax = rt.anchorMax,
+            pivot = rt.pivot,
+            anchoredPosition = rt.anchoredPosition,
+            sizeDelta = rt.sizeDelta
+        };
+        if (savedRectStates.ContainsKey(rt))
+            savedRectStates[rt] = state;
+        else
+            savedRectStates.Add(rt, state);
+    }
+
+    // 保存した状態を再適用するユーティリティ
+    private void ReapplySavedRectStates()
+    {
+        foreach (var kv in savedRectStates)
+        {
+            RectTransform rt = kv.Key;
+            RectTransformState s = kv.Value;
+            if (rt == null) continue;
+            rt.anchorMin = s.anchorMin;
+            rt.anchorMax = s.anchorMax;
+            rt.pivot = s.pivot;
+            rt.anchoredPosition = s.anchoredPosition;
+            rt.sizeDelta = s.sizeDelta;
         }
     }
 }
