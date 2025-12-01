@@ -41,6 +41,9 @@ public class CryptoAnswerCube : MonoBehaviour
     
     [Tooltip("フォントサイズ")]
     public int fontSize = 50;
+
+    [Tooltip("テキストに使用するフォント（Inspectorで指定）")]
+    public Font textFont; // 追加：Inspector でフォントを設定可能にする
     
     [Header("エフェクト設定")]
     [Tooltip("選択時のサウンド")]
@@ -129,24 +132,33 @@ public class CryptoAnswerCube : MonoBehaviour
         // より確実な日本語フォント設定
         Font selectedFont = null;
         
-        // システムフォントを試す
-        try 
+        // まず Inspector で指定されたフォントを優先
+        if (textFont != null)
         {
-            selectedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            selectedFont = textFont;
+            Debug.Log($"Inspector指定フォント使用: {selectedFont.name}");
         }
-        catch
+        else
         {
-            Debug.LogWarning("LegacyRuntime.ttfの読み込みに失敗");
-        }
-        
-        // フォントが見つからない場合は利用可能なフォントから選択
-        if (selectedFont == null)
-        {
-            Font[] availableFonts = Resources.FindObjectsOfTypeAll<Font>();
-            if (availableFonts.Length > 0)
+            // システムフォントを試す
+            try 
             {
-                selectedFont = availableFonts[0];
-                Debug.Log($"代替フォント使用: {selectedFont.name}");
+                selectedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            }
+            catch
+            {
+                Debug.LogWarning("LegacyRuntime.ttfの読み込みに失敗");
+            }
+            
+            // フォントが見つからない場合は利用可能なフォントから選択
+            if (selectedFont == null)
+            {
+                Font[] availableFonts = Resources.FindObjectsOfTypeAll<Font>();
+                if (availableFonts.Length > 0)
+                {
+                    selectedFont = availableFonts[0];
+                    Debug.Log($"代替フォント使用: {selectedFont.name}");
+                }
             }
         }
         

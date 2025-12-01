@@ -1208,6 +1208,10 @@ PrefabInstance:
       value: "\u6697\u53F7\u6587"
       objectReference: {fileID: 0}
     - target: {fileID: 3683621035352487520, guid: 68c0924454d014d9593985ac70894dee, type: 3}
+      propertyPath: m_FontData.m_Font
+      value: 
+      objectReference: {fileID: 12800000, guid: a726ef1d37d634892bd9ae0fbb1329b3, type: 3}
+    - target: {fileID: 3683621035352487520, guid: 68c0924454d014d9593985ac70894dee, type: 3}
       propertyPath: m_FontData.m_Alignment
       value: 7
       objectReference: {fileID: 0}
@@ -2192,6 +2196,7 @@ MonoBehaviour:
   textOffset: {x: 0, y: 1, z: 0.6}
   textScale: {x: 0.1, y: 0.3, z: 0.2}
   fontSize: 50
+  textFont: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
   disappearDelay: 0.3
@@ -3697,6 +3702,7 @@ MonoBehaviour:
   textOffset: {x: 0, y: 1, z: 0.6}
   textScale: {x: 0.1, y: 0.3, z: 0.2}
   fontSize: 50
+  textFont: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
   disappearDelay: 0.3
@@ -5032,7 +5038,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
     m_FontSize: 20
     m_FontStyle: 0
     m_BestFit: 0
@@ -6178,7 +6184,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: a726ef1d37d634892bd9ae0fbb1329b3, type: 3}
     m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 0
@@ -6592,6 +6598,7 @@ MonoBehaviour:
   textOffset: {x: 0, y: 1, z: 0.6}
   textScale: {x: 0.1, y: 0.3, z: 0.2}
   fontSize: 50
+  textFont: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
   disappearDelay: 0.3
@@ -7627,7 +7634,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: a726ef1d37d634892bd9ae0fbb1329b3, type: 3}
     m_FontSize: 35
     m_FontStyle: 1
     m_BestFit: 0
@@ -7699,7 +7706,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: a726ef1d37d634892bd9ae0fbb1329b3, type: 3}
     m_FontSize: 50
     m_FontStyle: 0
     m_BestFit: 0
@@ -7759,7 +7766,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
     m_FontSize: 20
     m_FontStyle: 0
     m_BestFit: 0
@@ -8156,7 +8163,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
     m_FontSize: 50
     m_FontStyle: 0
     m_BestFit: 0
@@ -8595,7 +8602,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: a726ef1d37d634892bd9ae0fbb1329b3, type: 3}
     m_FontSize: 40
     m_FontStyle: 0
     m_BestFit: 0
@@ -8682,7 +8689,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: a726ef1d37d634892bd9ae0fbb1329b3, type: 3}
     m_FontSize: 32
     m_FontStyle: 0
     m_BestFit: 0
@@ -8964,6 +8971,7 @@ MonoBehaviour:
   textOffset: {x: 0, y: 1, z: 0.6}
   textScale: {x: 0.1, y: 0.3, z: 0.2}
   fontSize: 50
+  textFont: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
   selectSound: {fileID: 0}
   hoverSound: {fileID: 0}
   disappearDelay: 0.3
@@ -10609,7 +10617,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
     m_FontSize: 20
     m_FontStyle: 0
     m_BestFit: 0
@@ -11253,7 +11261,7 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_FontData:
-    m_Font: {fileID: 10102, guid: 0000000000000000e000000000000000, type: 0}
+    m_Font: {fileID: 12800000, guid: bc922de763a604b08b33f6f068d0d015, type: 3}
     m_FontSize: 20
     m_FontStyle: 0
     m_BestFit: 0
